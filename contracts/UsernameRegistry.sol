@@ -14,15 +14,17 @@ contract UsernameRegistry {
 
     error UsernameUnavailable();
     error InvalidUsername();
+    error UsernameAlreadyAssigned();
 
     function registerUsername(string calldata username) external {
+        string memory existing = _usernameByOwner[msg.sender];
+        if (bytes(existing).length != 0) revert UsernameAlreadyAssigned();
+
         bytes memory normalized = _normalise(username);
         bytes32 usernameHash = keccak256(normalized);
         address currentOwner = _ownerByHash[usernameHash];
-        if (currentOwner != address(0) && currentOwner != msg.sender) revert UsernameUnavailable();
+        if (currentOwner != address(0)) revert UsernameUnavailable();
 
-        string memory previous = _usernameByOwner[msg.sender];
-        if (bytes(previous).length != 0) delete _ownerByHash[keccak256(bytes(previous))];
         _ownerByHash[usernameHash] = msg.sender;
         _usernameByOwner[msg.sender] = string(normalized);
         emit UsernameRegistered(msg.sender, usernameHash, string(normalized));

@@ -177,7 +177,7 @@ function DashboardContent() {
             )}
           </div>
           <p className="mt-1 text-sm text-gray-400">
-            Monitor and execute protected payments and subscription schedules in real-time.
+            Monitor and execute protected payments and scheduled payments in real-time.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -204,7 +204,7 @@ function DashboardContent() {
           { label: "Protected Payments", value: stats.total, icon: "shield", color: "text-emerald-400" },
           { label: "Pending Claims", value: stats.pending, icon: "history", color: "text-amber-400" },
           { label: "Completed Payments", value: stats.completed, icon: "check", color: "text-cyan-400" },
-          { label: "Active Subscriptions", value: userSchedules.filter(s => s.schedule.status === 0).length, icon: "layers", color: "text-rose-400" }
+          { label: "Scheduled Payments", value: userSchedules.filter(s => s.schedule.status === 0).length, icon: "layers", color: "text-rose-400" }
         ].map(item => (
           <div key={item.label} className="card relative overflow-hidden">
             <div className="flex items-start justify-between">
@@ -220,18 +220,24 @@ function DashboardContent() {
         ))}
       </div>
 
-      {/* Scheduled Subscriptions Section */}
+      {/* Scheduled Payments Section */}
       <div className="mt-10">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Your Scheduled Subscription Payments</h2>
-          <Link href="/agent" className="text-xs font-semibold text-emerald-400 hover:text-emerald-300">
-            Create Schedule via AI
-          </Link>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Your Scheduled Payments</h2>
+          <div className="flex items-center gap-3">
+            <Link href="/recurring" className="text-xs font-semibold text-emerald-400 hover:text-emerald-300">
+              Recurring Payments Form →
+            </Link>
+            <span className="text-gray-600">·</span>
+            <Link href="/agent" className="text-xs font-semibold text-cyan-400 hover:text-cyan-300">
+              Create via AI
+            </Link>
+          </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {userSchedules.length === 0 ? (
             <div className="card text-center py-8 col-span-2">
-              <p className="text-sm text-gray-500">No recurring or scheduled payments created yet.</p>
+              <p className="text-sm text-gray-500">No scheduled payments created yet.</p>
               <Link href="/agent" className="mt-3 inline-flex text-xs font-semibold text-emerald-400 hover:text-emerald-300">
                 Tell the agent: &quot;Send Bob 5 USDC weekly for 4 weeks&quot;
               </Link>
@@ -392,7 +398,7 @@ function DashboardContent() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Recent Escrows Activity</h2>
           <Link href="/payments" className="text-xs font-semibold text-emerald-400 hover:text-emerald-300">
-            View All History
+            View Payment History →
           </Link>
         </div>
         <div className="card divide-y divide-white/[0.04] p-0 overflow-hidden">

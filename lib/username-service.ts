@@ -147,6 +147,24 @@ export async function assignUsername(
   const clean = normalizeUsername(rawUsername);
   const lowerAddress = walletAddress.toLowerCase();
 
+  // Strict rule: A created username CANNOT be changed or updated!
+  const existingForWallet = await getUsernameByAddress(lowerAddress);
+  if (existingForWallet.found && existingForWallet.username) {
+    if (existingForWallet.username.toLowerCase() !== clean) {
+      return {
+        success: false,
+        error: `This wallet address already has an immutable username (@${existingForWallet.username}) assigned. Usernames on HashGuard cannot be changed or updated.`,
+        source: existingForWallet.source,
+      };
+    }
+    return {
+      success: true,
+      username: clean,
+      address: walletAddress,
+      source: existingForWallet.source,
+    };
+  }
+
   // Check if username is already claimed by another wallet
   const currentResolution = await resolveUsername(clean);
   if (

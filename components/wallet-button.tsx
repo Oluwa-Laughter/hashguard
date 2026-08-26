@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useRouter, usePathname } from "next/navigation";
 import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { hskChain, hskConfigured } from "@/lib/chains";
 import { shortAddress } from "@/lib/utils";
@@ -93,6 +94,8 @@ export function WalletButton({ className = "" }: { className?: string }) {
   const { username } = useUserUsername(address);
   const [showModal, setShowModal] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
 
   const wrongNetwork = isConnected && hskConfigured && chainId !== hskChain.id;
 
@@ -101,12 +104,15 @@ export function WalletButton({ className = "" }: { className?: string }) {
     setIsClient(true);
   }, []);
 
-  // Auto-close modal when connection status succeeds
+  // Auto-close modal and redirect straight to dashboard if on landing page
   useEffect(() => {
     if (isConnected) {
       setShowModal(false);
+      if (pathname === "/") {
+        router.push("/dashboard");
+      }
     }
-  }, [isConnected]);
+  }, [isConnected, pathname, router]);
 
   function handleConnect(connector: (typeof connectors)[number]) {
     if (typeof window !== "undefined") {

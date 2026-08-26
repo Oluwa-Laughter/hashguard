@@ -12,18 +12,20 @@ import { shortAddress } from "@/lib/utils";
 const navLinks = [
   ["Dashboard", "/dashboard"],
   ["Protected Pay", "/pay"],
+  ["Claim", "/claim"],
   ["Batch Pay", "/batch"],
-  ["Recurring", "/recurring"],
-  ["Payments", "/payments"],
+  ["Recurring Payments", "/recurring"],
+  ["Payment History", "/payments"],
   ["AI Agent", "/agent"],
 ] as const;
 
 function getIconForLink(label: string) {
   if (label.includes("Dashboard")) return "user";
   if (label.includes("Protected")) return "shield";
+  if (label.includes("Claim")) return "check";
   if (label.includes("Batch")) return "layers";
   if (label.includes("Recurring")) return "history";
-  if (label.includes("Payments")) return "lock";
+  if (label.includes("Payment") || label.includes("History")) return "lock";
   return "spark";
 }
 
@@ -146,26 +148,36 @@ export function AccessGuard({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <p className="eyebrow mt-6 text-emerald-400">HASHGUARD WORKSPACE</p>
-        <h1 className="text-white">Your protected workspace is waiting.</h1>
+        <p className="eyebrow mt-6 text-emerald-400">HASHGUARD ACCESS</p>
+        <h1 className="text-white">Your protected dashboard is waiting.</h1>
         <p className="text-gray-400">
           Connect your wallet to access secure escrow payments, batch transfers, verified usernames, and the HashGuard AI Agent.
         </p>
 
-        <div className="mt-8 flex flex-col justify-center gap-3.5 sm:flex-row">
-          <WalletButton className="w-full sm:w-auto" />
-          <button
-            type="button"
-            onClick={handleAddHskChain}
-            className="button button-secondary w-full sm:w-auto text-xs"
-            title="Automatically register HSKChain in MetaMask or OKX"
-          >
-            <Icon name="spark" className="h-3.5 w-3.5 text-emerald-400" />
-            Add {hskChain.name}
-          </button>
-          <Link href="/" className="button button-secondary w-full sm:w-auto">
-            Back to Home
-          </Link>
+        {/* Improved Button Hierarchy */}
+        <div className="mt-8 flex flex-col gap-3">
+          {/* Primary Action: Full-Width Connect Wallet */}
+          <WalletButton className="w-full py-3.5 text-sm font-bold shadow-lg shadow-emerald-500/20 justify-center rounded-xl" />
+
+          {/* Secondary Actions: Equal 2-Column Balance */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={handleAddHskChain}
+              className="button button-secondary py-2.5 px-3 text-xs font-semibold justify-center flex items-center gap-1.5"
+              title="Automatically register HSKChain in MetaMask, OKX, or Rabby"
+            >
+              <Icon name="spark" className="h-3.5 w-3.5 text-emerald-400 flex-shrink-0" />
+              <span>Add {hskChain.name}</span>
+            </button>
+            <Link
+              href="/"
+              className="button button-secondary py-2.5 px-3 text-xs font-semibold justify-center flex items-center gap-1.5"
+            >
+              <Icon name="arrow" className="h-3.5 w-3.5 rotate-180 text-gray-400 flex-shrink-0" />
+              <span>Back to Home</span>
+            </Link>
+          </div>
         </div>
 
         {addStatus && (

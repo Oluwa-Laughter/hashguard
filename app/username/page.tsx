@@ -177,145 +177,152 @@ function UsernameContent() {
           ). Senders can pay you using your username across all payments, batch transfers, and AI Agent requests!
         </p>
 
-        {/* Current Assigned Username Card */}
+        {/* Current Assigned Username Card (Permanent) */}
         {currentUsername ? (
-          <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5">
+          <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                  Your Active HashGuard Handle
+                  Your Permanent Username
                 </span>
-                <p className="text-2xl font-extrabold text-white mt-1">@{currentUsername}</p>
+                <p className="text-3xl font-extrabold text-white mt-1">@{currentUsername}</p>
               </div>
-              <span className="rounded-full border border-emerald-400/40 bg-emerald-400/20 px-3 py-1 text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+              <span className="rounded-full border border-emerald-400/40 bg-emerald-400/20 px-3.5 py-1 text-xs font-bold text-emerald-300 flex items-center gap-1.5">
                 <Icon name="check" className="h-3.5 w-3.5" />
-                Assigned & Verified
+                Permanent & Verified
               </span>
             </div>
 
-            <div className="mt-4 border-t border-emerald-500/20 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-200/80">
-              <span>Bound to: <strong className="font-mono text-white">{address ? shortAddress(address) : ""}</strong></span>
-              <Link
-                href={`/pay?recipient=@${currentUsername}`}
-                className="underline hover:text-white flex items-center gap-1"
-              >
-                Test your payment link <Icon name="arrow" className="h-3 w-3" />
+            <div className="mt-4 border-t border-emerald-500/20 pt-4 flex flex-col gap-2 text-xs text-emerald-200/90">
+              <p>
+                Bound to: <strong className="font-mono text-white">{address ? shortAddress(address) : ""}</strong>
+              </p>
+              <p className="text-gray-400 text-xs mt-1">
+                🔒 <strong>Immutable Binding</strong>: Usernames on HashGuard are permanently bound to your wallet address and cannot be changed or updated.
+              </p>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/dashboard" className="button button-primary py-2 text-xs">
+                ← Return to Dashboard
+              </Link>
+              <Link href={`/pay?recipient=@${currentUsername}`} className="button button-secondary py-2 text-xs">
+                Test Payment Link
               </Link>
             </div>
           </div>
         ) : (
-          <div className="mt-6 rounded-2xl border border-white/[0.06] bg-slate-900/40 p-4 text-xs text-gray-400">
-            <p className="font-semibold text-white">No username assigned yet</p>
-            <p className="mt-1">
-              Claim an identity below so friends, clients, and partners can send you payments without needing your long 0x address.
-            </p>
-          </div>
-        )}
+          <div>
+            <div className="mt-6 rounded-2xl border border-white/[0.06] bg-slate-900/40 p-4 text-xs text-gray-400">
+              <p className="font-semibold text-white">Choose Your Permanent Username</p>
+              <p className="mt-1">
+                Claim an identity so friends, clients, and partners can send you payments without needing your long 0x address.
+                <strong> Note: Once registered, your username is permanent and cannot be changed or updated.</strong>
+              </p>
+            </div>
 
-        {/* Input & Form */}
-        <div className="mt-6">
-          <label className="label">
-            {currentUsername ? "Change or Update Username" : "Choose Your Desired Username"}
-          </label>
-          <div className="relative mt-2">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">@</span>
-            <input
-              className="field pl-8 font-medium"
-              value={usernameInput}
-              onChange={(e) => {
-                setUsernameInput(e.target.value);
-                setErrorMsg(null);
-                setSuccessMsg(null);
-              }}
-              placeholder="e.g. alice, satoshi, dev_pro"
-              maxLength={32}
-            />
-          </div>
+            {/* Input & Form */}
+            <div className="mt-6">
+              <label className="label">Choose Your Desired Username</label>
+              <div className="relative mt-2">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">@</span>
+                <input
+                  className="field pl-8 font-medium"
+                  value={usernameInput}
+                  onChange={(e) => {
+                    setUsernameInput(e.target.value);
+                    setErrorMsg(null);
+                    setSuccessMsg(null);
+                  }}
+                  placeholder="e.g. alice, satoshi, dev_pro"
+                  maxLength={32}
+                />
+              </div>
 
-          {/* Availability & Validation Feedback */}
-          {clean.length > 0 && (
-            <div className="mt-2.5 text-xs">
-              {clean.length < 3 ? (
-                <span className="text-gray-500">Must be at least 3 characters (letters, numbers, underscore).</span>
-              ) : availabilityStatus.checking ? (
-                <span className="text-gray-400 animate-pulse flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                  Checking availability on HashGuard…
-                </span>
-              ) : availabilityStatus.available ? (
-                <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                  <Icon name="check" className="h-3.5 w-3.5" />
-                  @{clean} is available!
-                </span>
-              ) : (
-                <span className="text-rose-400 font-semibold flex items-center gap-1">
-                  <Icon name="x" className="h-3.5 w-3.5" />
-                  {availabilityStatus.error || `@${clean} is already claimed.`}
-                </span>
+              {/* Availability & Validation Feedback */}
+              {clean.length > 0 && (
+                <div className="mt-2.5 text-xs">
+                  {clean.length < 3 ? (
+                    <span className="text-gray-500">Must be at least 3 characters (letters, numbers, underscore).</span>
+                  ) : availabilityStatus.checking ? (
+                    <span className="text-gray-400 animate-pulse flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                      Checking availability on HashGuard…
+                    </span>
+                  ) : availabilityStatus.available ? (
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      <Icon name="check" className="h-3.5 w-3.5" />
+                      @{clean} is available!
+                    </span>
+                  ) : (
+                    <span className="text-rose-400 font-semibold flex items-center gap-1">
+                      <Icon name="x" className="h-3.5 w-3.5" />
+                      {availabilityStatus.error || `@${clean} is already claimed.`}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
 
-        {/* Preview of Resolved Destination */}
-        {clean.length >= 3 && availabilityStatus.available && (
-          <div className="mt-4 rounded-xl border border-white/[0.04] bg-white/[0.02] p-3 text-xs text-gray-400">
-            <span className="font-semibold text-gray-300">Preview Mapping:</span>
-            <p className="mt-1 font-mono text-emerald-400">
-              @{clean} ➔ {address || "Connect wallet"}
-            </p>
+            {/* Preview of Resolved Destination */}
+            {clean.length >= 3 && availabilityStatus.available && (
+              <div className="mt-4 rounded-xl border border-white/[0.04] bg-white/[0.02] p-3 text-xs text-gray-400">
+                <span className="font-semibold text-gray-300">Preview Permanent Mapping:</span>
+                <p className="mt-1 font-mono text-emerald-400">
+                  @{clean} ➔ {address || "Connect wallet"}
+                </p>
+              </div>
+            )}
+
+            {errorMsg && (
+              <p className="mt-4 rounded-xl border border-rose-500/25 bg-rose-500/10 p-3.5 text-xs text-rose-300">
+                {errorMsg}
+              </p>
+            )}
+
+            {successMsg && (
+              <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-300">
+                <p className="font-semibold">{successMsg}</p>
+                <p className="mt-1 text-[11px] text-emerald-200/80">
+                  Your handle is now permanent for payments, batch distributions, and AI Agent requests.
+                </p>
+              </div>
+            )}
+
+            <button
+              className="button button-primary mt-6 w-full"
+              disabled={
+                !isConnected ||
+                clean.length < 3 ||
+                availabilityStatus.checking ||
+                availabilityStatus.available === false ||
+                assigning ||
+                isPending ||
+                receipt.isLoading
+              }
+              onClick={handleAssignUsername}
+            >
+              {assigning
+                ? "Assigning username…"
+                : isPending
+                ? "Awaiting wallet confirmation…"
+                : receipt.isLoading
+                ? "Confirming on HSKChain…"
+                : `Claim & Bind @${clean || "username"} (Permanent)`}
+            </button>
+
+            <TransactionState
+              state={
+                hash
+                  ? receipt.isSuccess
+                    ? "Registered on HSKChain ✓"
+                    : "Confirming on HSKChain…"
+                  : undefined
+              }
+              hash={hash}
+            />
           </div>
         )}
-
-        {errorMsg && (
-          <p className="mt-4 rounded-xl border border-rose-500/25 bg-rose-500/10 p-3.5 text-xs text-rose-300">
-            {errorMsg}
-          </p>
-        )}
-
-        {successMsg && (
-          <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-300">
-            <p className="font-semibold">{successMsg}</p>
-            <p className="mt-1 text-[11px] text-emerald-200/80">
-              Your handle is now active for payments, batch distributions, and AI Agent requests.
-            </p>
-          </div>
-        )}
-
-        <button
-          className="button button-primary mt-6 w-full"
-          disabled={
-            !isConnected ||
-            clean.length < 3 ||
-            availabilityStatus.checking ||
-            availabilityStatus.available === false ||
-            assigning ||
-            isPending ||
-            receipt.isLoading
-          }
-          onClick={handleAssignUsername}
-        >
-          {assigning
-            ? "Assigning username…"
-            : isPending
-            ? "Awaiting wallet confirmation…"
-            : receipt.isLoading
-            ? "Confirming on HSKChain…"
-            : currentUsername
-            ? `Update to @${clean}`
-            : `Claim & Assign @${clean || "username"}`}
-        </button>
-
-        <TransactionState
-          state={
-            hash
-              ? receipt.isSuccess
-                ? "Registered on HSKChain ✓"
-                : "Confirming on HSKChain…"
-              : undefined
-          }
-          hash={hash}
-        />
       </div>
     </main>
   );

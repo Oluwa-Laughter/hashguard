@@ -286,7 +286,7 @@ export function RecurringForm({ initial }: RecurringFormProps) {
         <div>
           <h2 className="text-xl font-bold text-white">Create Recurring Payment Schedule</h2>
           <p className="muted mt-1 text-sm leading-relaxed">
-            Automate subscriptions, payroll, and recurring retainers using global stablecoins (USDT, USDC, DAI, EURC) or HSK.
+            Automate scheduled payments, payroll, and recurring retainers using global stablecoins (USDT, USDC, DAI, EURC) or HSK.
           </p>
         </div>
       </div>

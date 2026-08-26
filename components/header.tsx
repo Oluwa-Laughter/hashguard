@@ -13,9 +13,8 @@ const workspaceLinks = [
   ["Protected Pay", "/pay"],
   ["Claim", "/claim"],
   ["Batch Pay", "/batch"],
-  ["Recurring", "/recurring"],
-  ["Identity", "/username"],
-  ["Payments", "/payments"],
+  ["Recurring Payments", "/recurring"],
+  ["Payment History", "/payments"],
   ["AI Agent", "/agent"],
 ] as const;
 
@@ -83,7 +82,7 @@ export function Header() {
             className="hidden sm:inline-flex rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs font-bold text-emerald-400 transition-all hover:bg-emerald-500/20 hover:border-emerald-400"
             href="/dashboard"
           >
-            {isConnected ? "Workspace" : "Launch App"}
+            {isConnected ? "Dashboard" : "Launch App"}
           </Link>
           <WalletButton className="text-xs py-2 px-3 sm:px-4" />
           
@@ -132,7 +131,7 @@ export function Header() {
                 className="button button-primary w-full text-center py-2.5 text-xs font-bold"
                 href="/dashboard"
               >
-                {isConnected ? "Go to Workspace" : "Launch App"}
+                {isConnected ? "Dashboard" : "Launch App"}
               </Link>
             </div>
           </nav>

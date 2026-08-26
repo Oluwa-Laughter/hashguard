@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAccount } from "wagmi";
 import { AnimatedShield } from "@/components/animated-shield";
 import { Icon, type IconName } from "@/components/icons";
 import { ScrollReveal } from "@/components/scroll-reveal";
@@ -24,6 +27,15 @@ const flow = [
 ];
 
 export function LandingPage() {
+  const { isConnected } = useAccount();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isConnected) {
+      router.push("/dashboard");
+    }
+  }, [isConnected, router]);
+
   return (
     <main className="relative z-10">
       {/* Hero Section */}

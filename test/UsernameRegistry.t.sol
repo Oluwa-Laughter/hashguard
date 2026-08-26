@@ -32,11 +32,10 @@ contract UsernameRegistryTest {
         vm.prank(alice); registry.registerUsername("alice!wrong");
     }
 
-    function testUsernameOwnershipCanMove() public {
+    function testCannotChangeOrUpdateUsername() public {
         vm.prank(alice); registry.registerUsername("alice");
+        vm.expectRevert(UsernameRegistry.UsernameAlreadyAssigned.selector);
         vm.prank(alice); registry.registerUsername("alice_new");
-        assert(registry.resolveUsername("alice") == address(0));
-        assert(registry.resolveUsername("alice_new") == alice);
     }
 }
 

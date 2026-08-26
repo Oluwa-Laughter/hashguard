@@ -46,7 +46,7 @@ function PaymentsContent() {
   return (
     <main className="shell py-12">
       <p className="text-sm font-bold tracking-widest text-emerald-400">ON-CHAIN ACTIVITY</p>
-      <h1 className="mt-2 text-3xl font-extrabold text-white">Payment history</h1>
+      <h1 className="mt-2 text-3xl font-extrabold text-white">Payment History</h1>
       <p className="muted mt-2">
         Escrow state is read directly from the HashGuard contract.
       </p>
