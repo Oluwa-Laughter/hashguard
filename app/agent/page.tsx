@@ -50,10 +50,10 @@ function AgentContent() {
   }
 
   const payHref = intent?.action === "protected_transfer"
-    ? `/pay?recipient=${encodeURIComponent(intent.recipient)}&amount=${intent.amount}&days=${intent.expiryDays}&token=${intent.token}`
+    ? `/pay?recipient=${encodeURIComponent(intent.recipient)}&amount=${intent.amount}&days=${intent.expiryDays}&token=${intent.token}&symbol=${encodeURIComponent(intent.tokenSymbol || (intent.token === "token" ? "USDC" : "HSK"))}`
     : "#";
   const batchHref = intent?.action === "batch_payment"
-    ? `/batch?payments=${encodeURIComponent(JSON.stringify(intent.payments))}`
+    ? `/batch?payments=${encodeURIComponent(JSON.stringify(intent.payments))}&token=${intent.token}&symbol=${encodeURIComponent(intent.tokenSymbol || (intent.token === "token" ? "USDC" : "HSK"))}`
     : "#";
 
   return (
@@ -121,7 +121,7 @@ function AgentContent() {
                   </div>
                   <div className="flex justify-between">
                     <dt>Amount</dt>
-                    <dd>{intent.amount} {intent.token === "native" ? "HSK" : "USDC"}</dd>
+                    <dd>{intent.amount} {intent.tokenSymbol || (intent.token === "native" ? "HSK" : "USDC")}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt>Protection</dt>
@@ -136,7 +136,7 @@ function AgentContent() {
               <div className="mt-3">
                 <p className="font-semibold">BATCH PAYMENT</p>
                 {intent.payments.map(payment => (
-                  <p key={payment.recipient} className="mt-2 text-sm">{payment.recipient}<span className="float-right">{payment.amount} HSK</span></p>
+                  <p key={payment.recipient} className="mt-2 text-sm">{payment.recipient}<span className="float-right">{payment.amount} {intent.tokenSymbol || "HSK"}</span></p>
                 ))}
                 <Link className="button button-primary mt-5" href={batchHref}>Continue to batch review</Link>
               </div>

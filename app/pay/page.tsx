@@ -14,7 +14,8 @@ function PayContent() {
           recipient: query.get("recipient") || undefined,
           amount: query.get("amount") || undefined,
           days: query.get("days") || undefined,
-          token: query.get("token") === "token" ? "token" : "native"
+          token: query.get("token") === "token" ? "token" : "native",
+          tokenSymbol: query.get("symbol") || undefined,
         }}
       />
     </main>

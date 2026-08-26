@@ -55,9 +55,12 @@ export function LandingPage() {
             
             <ScrollReveal delay={300}>
               <div className="mt-8 flex flex-wrap gap-4">
+                <Link href="/dashboard" className="button button-primary">
+                  Launch App <Icon name="arrow" className="h-4 w-4" />
+                </Link>
                 <WalletButton />
                 <Link href="#how-it-works" className="button button-secondary">
-                  Explore HashGuard <Icon name="arrow" className="h-4 w-4" />
+                  How it works
                 </Link>
               </div>
             </ScrollReveal>
@@ -379,6 +382,9 @@ export function LandingPage() {
               Start sending protected payments on HSK Chain today.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
+              <Link href="/dashboard" className="button button-primary">
+                Launch App <Icon name="arrow" className="h-4 w-4" />
+              </Link>
               <WalletButton />
               <Link href="/agent" className="button button-secondary">
                 Explore the Agent

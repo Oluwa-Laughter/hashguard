@@ -9,7 +9,10 @@ function BatchContent() {
   const query = useSearchParams();
   return (
     <main className="shell max-w-3xl py-12">
-      <BatchForm initial={query.get("payments") || undefined} />
+      <BatchForm
+        initial={query.get("payments") || undefined}
+        initialSymbol={query.get("symbol") || undefined}
+      />
     </main>
   );
 }

@@ -1,18 +1,186 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fallbackIntent } from "@/lib/agent";
 
-export async function POST(request: NextRequest) {
-  const { message } = await request.json() as { message?: string };
-  if (!message?.trim()) return NextResponse.json({ error: "Message is required." }, { status: 400 });
-  const apiKey = process.env.MISTRAL_API_KEY;
-  if (!apiKey) return NextResponse.json({ intent: fallbackIntent(message), provider: "local-parser" });
-  const system = `You are HashGuard Agent. Return only valid JSON with one of these forms: {"action":"protected_transfer","recipient":"@name or 0x address","amount":"decimal","token":"native"|"token","expiryDays":positive integer}; {"action":"batch_payment","payments":[{"recipient":"@name","amount":"decimal"}],"token":"native"|"token"}; {"action":"wallet_balance"}; {"action":"payment_history"}; {"action":"explain_payment"}; or {"action":"unknown","message":"short clarification"}. You prepare intent only. Never provide an address, balance, hash, or claim it was executed. Default protected-payment expiry is 7 days.`;
-  try {
-    const response = await fetch("https://api.mistral.ai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "mistral-small-latest", temperature: 0, response_format: { type: "json_object" }, messages: [{ role: "system", content: system }, { role: "user", content: message }] }) });
-    if (!response.ok) throw new Error("provider response");
-    const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const intent = JSON.parse(body.choices?.[0]?.message?.content || "{}") as unknown;
-    return NextResponse.json({ intent, provider: "mistral" });
-  } catch { return NextResponse.json({ intent: fallbackIntent(message), provider: "local-parser", warning: "The AI provider was unavailable, so HashGuard used its local intent parser." }); }
+const SYSTEM_PROMPT = `You are HashGuard Agent, the autonomous intent-to-execution assistant for HashGuard on HSKChain.
+Your role is to analyze payment instructions and return structured transaction intents.
+HashGuard supports native HSK and ERC-20 tokens (USDC, USDT, WETH, or custom tokens).
+
+Always return ONLY valid JSON adhering strictly to one of the following schemas:
+
+1. Protected Payment:
+{
+  "action": "protected_transfer",
+  "recipient": "@username or 0x address",
+  "amount": "decimal string (e.g. '10' or '0.5')",
+  "token": "native" | "token",
+  "tokenSymbol": "HSK" | "USDC" | "USDT" | "WETH",
+  "expiryDays": positive integer (default 7 if not specified)
 }
 
+2. Batch Payment:
+{
+  "action": "batch_payment",
+  "payments": [{"recipient": "@username or 0x address", "amount": "decimal string"}],
+  "token": "native" | "token",
+  "tokenSymbol": "HSK" | "USDC" | "USDT" | "WETH"
+}
+
+3. Check Balance:
+{
+  "action": "wallet_balance",
+  "tokenSymbol": "HSK" | "USDC" | "USDT" | "WETH"
+}
+
+4. Payment History:
+{
+  "action": "payment_history"
+}
+
+5. Explain Concept:
+{
+  "action": "explain_payment"
+}
+
+6. Unknown/Clarification:
+{
+  "action": "unknown",
+  "message": "concise guidance"
+}
+
+Rules:
+- For HSK payments: token is "native", tokenSymbol is "HSK".
+- For USDT, USDC, WETH, or other ERC-20s: token is "token", tokenSymbol is the uppercase symbol.
+- Default protection period is 7 days.
+- Never output markdown tags or explanations outside the JSON. Return raw JSON only.`;
+
+export async function POST(request: NextRequest) {
+  try {
+    const { message } = (await request.json()) as { message?: string };
+    if (!message?.trim()) {
+      return NextResponse.json({ error: "Message is required." }, { status: 400 });
+    }
+
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const mistralKey = process.env.MISTRAL_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    // 1. Priority: Google Gemini (fastest structured output, generous free tier)
+    if (geminiKey) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: message }] }],
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0,
+            },
+          }),
+        });
+
+        if (res.ok) {
+          const data = (await res.json()) as {
+            candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+          };
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            const intent = JSON.parse(text);
+            return NextResponse.json({ intent, provider: "gemini-2.0-flash" });
+          }
+        }
+      } catch (err) {
+        console.warn("Gemini agent call failed, falling back:", err);
+      }
+    }
+
+    // 2. Mistral AI
+    if (mistralKey) {
+      try {
+        const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${mistralKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "mistral-small-latest",
+            temperature: 0,
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: message },
+            ],
+          }),
+        });
+
+        if (res.ok) {
+          const body = (await res.json()) as {
+            choices?: Array<{ message?: { content?: string } }>;
+          };
+          const content = body.choices?.[0]?.message?.content;
+          if (content) {
+            const intent = JSON.parse(content);
+            return NextResponse.json({ intent, provider: "mistral" });
+          }
+        }
+      } catch (err) {
+        console.warn("Mistral agent call failed, falling back:", err);
+      }
+    }
+
+    // 3. OpenAI
+    if (openaiKey) {
+      try {
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            temperature: 0,
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: message },
+            ],
+          }),
+        });
+
+        if (res.ok) {
+          const body = (await res.json()) as {
+            choices?: Array<{ message?: { content?: string } }>;
+          };
+          const content = body.choices?.[0]?.message?.content;
+          if (content) {
+            const intent = JSON.parse(content);
+            return NextResponse.json({ intent, provider: "openai" });
+          }
+        }
+      } catch (err) {
+        console.warn("OpenAI agent call failed, falling back:", err);
+      }
+    }
+
+    // 4. Zero-downtime local regex parser fallback
+    const intent = fallbackIntent(message);
+    return NextResponse.json({
+      intent,
+      provider: "local-parser",
+      note: "Operating on high-performance local parser (add GEMINI_API_KEY for full conversational AI).",
+    });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        intent: fallbackIntent(""),
+        provider: "local-parser",
+        error: err instanceof Error ? err.message : "Agent processing error",
+      },
+      { status: 200 }
+    );
+  }
+}

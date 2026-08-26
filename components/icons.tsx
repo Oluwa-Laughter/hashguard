@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-export type IconName = "shield" | "spark" | "wallet" | "layers" | "history" | "arrow" | "lock" | "check" | "link" | "user" | "terminal" | "copy";
+export type IconName = "shield" | "spark" | "wallet" | "layers" | "history" | "arrow" | "lock" | "check" | "link" | "user" | "terminal" | "copy" | "plus" | "x";
 
 const paths: Record<IconName, React.ReactNode> = {
   shield: <path d="M12 3 4.5 6.2v5.1c0 4.6 3.1 8.8 7.5 9.7 4.4-.9 7.5-5.1 7.5-9.7V6.2L12 3Zm-3.2 9 2.1 2.1 4.5-4.6" />,
@@ -14,7 +14,9 @@ const paths: Record<IconName, React.ReactNode> = {
   link: <path d="M10 13.8a4 4 0 0 0 5.7.1l2-2a4 4 0 0 0-5.7-5.7l-1.1 1.1M14 10.2a4 4 0 0 0-5.7-.1l-2 2a4 4 0 0 0 5.7 5.7l1.1-1.1" />,
   user: <path d="M20 21a8 8 0 0 0-16 0M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />,
   terminal: <path d="m7 8 3 3-3 3m5 0h5M4 4h16v16H4z" />,
-  copy: <path d="M9 9h10v10H9zM5 15H4V5h10v1" />
+  copy: <path d="M9 9h10v10H9zM5 15H4V5h10v1" />,
+  plus: <path d="M12 5v14m-7-7h14" />,
+  x: <path d="M18 6 6 18M6 6l12 12" />
 };
 
 export function Icon({ name, className = "", ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {
