@@ -1,20 +1,55 @@
 "use client";
 
 import Link from "next/link";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { hskConfigured } from "@/lib/chains";
+import { useAccount } from "wagmi";
+import { Icon } from "@/components/icons";
+import { WalletButton } from "@/components/wallet-button";
 
-const links = [["Dashboard", "/dashboard"], ["Pay", "/pay"], ["Batch", "/batch"], ["Payments", "/payments"], ["Agent", "/agent"]] as const;
-const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
+const publicLinks = [
+  ["How it works", "/#how-it-works"],
+  ["Features", "/#features"],
+  ["Security", "/#security"],
+  ["AI Agent", "/#agent"]
+] as const;
 
 export function Header() {
-  const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending } = useConnect();
-  const { disconnect } = useDisconnect();
-  return <header className="border-b border-emerald-100/10 bg-[#07110f]/90"><div className="shell flex min-h-16 items-center justify-between gap-5">
-    <Link href="/" className="font-bold tracking-tight"><span className="text-emerald-400">Hash</span>Guard</Link>
-    <nav className="hidden gap-4 text-sm text-emerald-50/65 md:flex">{links.map(([label, href]) => <Link key={href} href={href} className="hover:text-emerald-300">{label}</Link>)}</nav>
-    {isConnected ? <button className="button-secondary text-sm" onClick={() => disconnect()}>{short(address!)}</button> : <button className="button text-sm" disabled={!hskConfigured || isPending} onClick={() => connect({ connector: connectors[0] })}>{hskConfigured ? "Connect wallet" : "HSK config required"}</button>}
-  </div></header>;
-}
+  const { isConnected } = useAccount();
 
+  return (
+    <header className="app-header sticky top-0 z-50 w-full border-b border-white/[0.06] bg-slate-950/70 backdrop-blur-md">
+      <div className="shell flex min-h-[70px] items-center justify-between gap-4">
+        {/* Brand Logo */}
+        <Link href="/" className="flex items-center gap-2.5 font-semibold tracking-tight transition hover:opacity-90">
+          <span className="brand-mark">
+            <Icon name="shield" className="h-4 w-4" />
+          </span>
+          <span className="text-base font-extrabold tracking-tight text-white sm:text-lg">
+            <span className="text-emerald-400">Hash</span>Guard
+          </span>
+        </Link>
+
+        {/* Desktop Navigation Links */}
+        <nav className="hidden items-center gap-8 text-sm font-medium text-gray-400 lg:flex">
+          {publicLinks.map(([label, href]) => (
+            <Link key={href} href={href} className="transition-colors hover:text-emerald-400">
+              {label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Actions / Wallet Status */}
+        <div className="flex items-center gap-4">
+          {isConnected && (
+            <Link
+              className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-2 text-xs font-semibold text-emerald-400 transition-all hover:bg-emerald-500/10 hover:border-emerald-500/40"
+              href="/dashboard"
+            >
+              Workspace
+            </Link>
+          )}
+          <WalletButton />
+        </div>
+      </div>
+    </header>
+  );
+}
