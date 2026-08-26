@@ -2,14 +2,68 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useAccount, useBalance, useReadContract } from "wagmi";
-import { zeroAddress } from "viem";
+import { useAccount, useBalance } from "wagmi";
 import { AgentIntent } from "@/lib/agent";
-import { usernameRegistryAbi, usernameRegistryAddress } from "@/lib/contracts";
-import { cleanUsername, shortAddress } from "@/lib/utils";
+import { shortAddress } from "@/lib/utils";
 import { AccessGuard } from "@/components/access-guard";
 import { Icon } from "@/components/icons";
-import { resolveUsernameApi } from "@/lib/username-client";
+import { resolveUsernameApi, getUsernameByAddressApi } from "@/lib/username-client";
+
+function BatchPaymentItem({ recipient, amount }: { recipient: string; amount: string }) {
+  const [resolvedAddress, setResolvedAddress] = useState<string>();
+  const [resolvedUsername, setResolvedUsername] = useState<string>();
+  const [resolving, setResolving] = useState(false);
+
+  useEffect(() => {
+    if (!recipient) return;
+    setResolving(true);
+
+    if (recipient.startsWith("@")) {
+      resolveUsernameApi(recipient)
+        .then((res) => {
+          if (res.found && res.address) {
+            setResolvedAddress(res.address);
+          }
+        })
+        .finally(() => setResolving(false));
+    } else if (recipient.startsWith("0x")) {
+      setResolvedAddress(recipient);
+      getUsernameByAddressApi(recipient)
+        .then((res) => {
+          if (res.found && res.username) {
+            setResolvedUsername("@" + res.username);
+          }
+        })
+        .finally(() => setResolving(false));
+    } else {
+      resolveUsernameApi("@" + recipient)
+        .then((res) => {
+          if (res.found && res.address) {
+            setResolvedAddress(res.address);
+          }
+        })
+        .finally(() => setResolving(false));
+    }
+  }, [recipient]);
+
+  return (
+    <div className="flex justify-between items-center py-2.5 border-b border-white/[0.04] last:border-0 text-sm">
+      <div>
+        <p className="font-bold text-white">
+          {recipient.startsWith("0x") && resolvedUsername ? `${resolvedUsername} (${shortAddress(recipient)})` : recipient}
+        </p>
+        {!recipient.startsWith("0x") && (
+          <p className="text-xs text-gray-500 mt-0.5 font-semibold">
+            {resolving ? "Resolving address…" : resolvedAddress ? `Resolved: ${shortAddress(resolvedAddress)}` : "Not resolved in database"}
+          </p>
+        )}
+      </div>
+      <div className="text-right">
+        <p className="font-bold text-emerald-400">{amount} HSK</p>
+      </div>
+    </div>
+  );
+}
 
 function AgentContent() {
   const [message, setMessage] = useState("");
@@ -21,39 +75,62 @@ function AgentContent() {
   const balance = useBalance({ address });
   const recipient = intent && (intent.action === "protected_transfer" || intent.action === "recurring_payment") ? intent.recipient : "";
 
-  const resolution = useReadContract({
-    address: usernameRegistryAddress ?? zeroAddress,
-    abi: usernameRegistryAbi,
-    functionName: "resolveUsername",
-    args: [cleanUsername(recipient)],
-    query: { enabled: Boolean(recipient.startsWith("@") && usernameRegistryAddress) }
-  });
-
   const [apiResolvedAddress, setApiResolvedAddress] = useState<string>();
+  const [apiResolvedUsername, setApiResolvedUsername] = useState<string>();
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
-    if (!recipient.startsWith("@")) {
+    if (!recipient) {
       setApiResolvedAddress(undefined);
+      setApiResolvedUsername(undefined);
       return;
     }
-    if (resolution.data && resolution.data !== zeroAddress) {
-      setApiResolvedAddress(undefined);
-      return;
-    }
+
     let active = true;
-    resolveUsernameApi(recipient).then((res) => {
-      if (active && res.found && res.address?.startsWith("0x")) {
-        setApiResolvedAddress(res.address);
-      }
-    });
+    setResolving(true);
+
+    if (recipient.startsWith("@")) {
+      setApiResolvedUsername(undefined);
+      resolveUsernameApi(recipient).then((res) => {
+        if (active) {
+          if (res.found && res.address?.startsWith("0x")) {
+            setApiResolvedAddress(res.address);
+          } else {
+            setApiResolvedAddress(undefined);
+          }
+          setResolving(false);
+        }
+      });
+    } else if (recipient.startsWith("0x")) {
+      setApiResolvedAddress(undefined);
+      getUsernameByAddressApi(recipient).then((res) => {
+        if (active) {
+          if (res.found && res.username) {
+            setApiResolvedUsername("@" + res.username);
+          } else {
+            setApiResolvedUsername(undefined);
+          }
+          setResolving(false);
+        }
+      });
+    } else {
+      setApiResolvedUsername(undefined);
+      resolveUsernameApi("@" + recipient).then((res) => {
+        if (active) {
+          if (res.found && res.address?.startsWith("0x")) {
+            setApiResolvedAddress(res.address);
+          } else {
+            setApiResolvedAddress(undefined);
+          }
+          setResolving(false);
+        }
+      });
+    }
+
     return () => {
       active = false;
     };
-  }, [recipient, resolution.data]);
-
-  const resolvedRecipient =
-    (resolution.data && resolution.data !== zeroAddress ? resolution.data : undefined) ||
-    apiResolvedAddress;
+  }, [recipient]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -78,13 +155,13 @@ function AgentContent() {
   }
 
   const payHref = intent?.action === "protected_transfer"
-    ? `/pay?recipient=${encodeURIComponent(intent.recipient)}&amount=${intent.amount}&days=${intent.expiryDays}&token=${intent.token}`
+    ? `/pay?recipient=${encodeURIComponent(recipient.startsWith("@") ? recipient : apiResolvedUsername || recipient)}&amount=${intent.amount}&days=${intent.expiryDays}&token=${intent.token}`
     : "#";
   const batchHref = intent?.action === "batch_payment"
     ? `/batch?payments=${encodeURIComponent(JSON.stringify(intent.payments))}`
     : "#";
   const recurringHref = intent?.action === "recurring_payment"
-    ? `/recurring?recipient=${encodeURIComponent(intent.recipient)}&amount=${intent.amountPerPeriod}&interval=${intent.interval}&periods=${intent.frequencyCount}&token=${intent.token}`
+    ? `/recurring?recipient=${encodeURIComponent(recipient.startsWith("@") ? recipient : apiResolvedUsername || recipient)}&amount=${intent.amountPerPeriod}&interval=${intent.interval}&periods=${intent.frequencyCount}&token=${intent.token}`
     : "#";
 
   return (
@@ -147,12 +224,19 @@ function AgentContent() {
                 <dl className="mt-3 grid gap-2 text-sm">
                   <div className="flex justify-between">
                     <dt>Recipient</dt>
-                    <dd>{intent.recipient}</dd>
+                    <dd>{recipient}</dd>
                   </div>
-                  <div className="flex justify-between">
-                    <dt>Resolved address</dt>
-                    <dd>{recipient.startsWith("@") ? (resolution.isLoading ? "Resolving…" : (resolvedRecipient ? shortAddress(resolvedRecipient) : "Not resolved")) : shortAddress(recipient)}</dd>
-                  </div>
+                  {recipient.startsWith("0x") ? (
+                    <div className="flex justify-between">
+                      <dt>Resolved Username</dt>
+                      <dd>{resolving ? "Resolving…" : apiResolvedUsername || "No registered username found"}</dd>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <dt>Resolved Address</dt>
+                      <dd>{resolving ? "Resolving…" : apiResolvedAddress ? shortAddress(apiResolvedAddress) : "Not resolved in database"}</dd>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <dt>Amount</dt>
                     <dd>{intent.amount} {intent.token === "native" ? "HSK" : "USDC"}</dd>
@@ -168,10 +252,16 @@ function AgentContent() {
             )}
             {intent.action === "batch_payment" && (
               <div className="mt-3">
-                <p className="font-semibold">BATCH PAYMENT</p>
-                {intent.payments.map(payment => (
-                  <p key={payment.recipient} className="mt-2 text-sm">{payment.recipient}<span className="float-right">{payment.amount} HSK</span></p>
-                ))}
+                <p className="font-semibold mb-3">BATCH PAYMENT</p>
+                <div className="divide-y divide-white/[0.04] max-h-60 overflow-y-auto pr-1">
+                  {intent.payments.map((payment) => (
+                    <BatchPaymentItem
+                      key={payment.recipient}
+                      recipient={payment.recipient}
+                      amount={payment.amount}
+                    />
+                  ))}
+                </div>
                 <Link className="button button-primary mt-5" href={batchHref}>Continue to batch review</Link>
               </div>
             )}
@@ -181,12 +271,19 @@ function AgentContent() {
                 <dl className="mt-3 grid gap-2 text-sm">
                   <div className="flex justify-between">
                     <dt>Recipient</dt>
-                    <dd>{intent.recipient}</dd>
+                    <dd>{recipient}</dd>
                   </div>
-                  <div className="flex justify-between">
-                    <dt>Resolved address</dt>
-                    <dd>{recipient.startsWith("@") ? (resolution.isLoading ? "Resolving…" : (resolution.data && resolution.data !== zeroAddress ? shortAddress(resolution.data) : "Not resolved on-chain")) : shortAddress(recipient)}</dd>
-                  </div>
+                  {recipient.startsWith("0x") ? (
+                    <div className="flex justify-between">
+                      <dt>Resolved Username</dt>
+                      <dd>{resolving ? "Resolving…" : apiResolvedUsername || "No registered username found"}</dd>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <dt>Resolved Address</dt>
+                      <dd>{resolving ? "Resolving…" : apiResolvedAddress ? shortAddress(apiResolvedAddress) : "Not resolved in database"}</dd>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <dt>Amount Per Period</dt>
                     <dd>{intent.amountPerPeriod} {intent.tokenSymbol}</dd>

@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import { createClient } from "@supabase/supabase-js";
 import { cleanUsername } from "./utils";
 
@@ -10,45 +8,6 @@ const supabaseKey =
 
 export const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
-
-// Secondary local file store (only used if Supabase is completely unconfigured)
-const DATA_DIR = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "usernames.json");
-
-function ensureDataFile() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(DATA_FILE)) {
-    // Empty store — absolutely no demo data
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ usernames: {}, addresses: {} }, null, 2));
-  }
-}
-
-interface LocalStore {
-  usernames: Record<string, string>; // username -> address
-  addresses: Record<string, string>; // lower(address) -> username
-}
-
-function readLocalStore(): LocalStore {
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(DATA_FILE, "utf-8");
-    return JSON.parse(raw) as LocalStore;
-  } catch (err) {
-    console.error("Failed to read local usernames store:", err);
-    return { usernames: {}, addresses: {} };
-  }
-}
-
-function writeLocalStore(store: LocalStore) {
-  try {
-    ensureDataFile();
-    fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2));
-  } catch (err) {
-    console.error("Failed to write local usernames store:", err);
-  }
-}
 
 /**
  * Normalizes username according to HashGuard specifications:
@@ -82,12 +41,11 @@ export async function resolveUsername(rawUsername: string): Promise<{
   found: boolean;
   address?: string;
   username: string;
-  source: "supabase" | "local" | "none";
+  source: "supabase" | "none";
 }> {
   const clean = normalizeUsername(rawUsername);
   if (!clean) return { found: false, username: clean, source: "none" };
 
-  // 1. Primary: Supabase Backend Database
   if (supabase) {
     try {
       const { data, error } = await supabase
@@ -112,18 +70,6 @@ export async function resolveUsername(rawUsername: string): Promise<{
     }
   }
 
-  // 2. Fallback to local store only if Supabase is unconfigured
-  const store = readLocalStore();
-  const address = store.usernames[clean];
-  if (address) {
-    return {
-      found: true,
-      address,
-      username: clean,
-      source: "local",
-    };
-  }
-
   return { found: false, username: clean, source: "none" };
 }
 
@@ -134,14 +80,13 @@ export async function getUsernameByAddress(walletAddress: string): Promise<{
   found: boolean;
   username?: string;
   address: string;
-  source: "supabase" | "local" | "none";
+  source: "supabase" | "none";
 }> {
   if (!walletAddress || !walletAddress.startsWith("0x")) {
     return { found: false, address: walletAddress, source: "none" };
   }
   const lowerAddress = walletAddress.toLowerCase();
 
-  // 1. Primary: Supabase Backend Database
   if (supabase) {
     try {
       const { data, error } = await supabase
@@ -166,18 +111,6 @@ export async function getUsernameByAddress(walletAddress: string): Promise<{
     }
   }
 
-  // 2. Fallback to local store only if Supabase is unconfigured
-  const store = readLocalStore();
-  const username = store.addresses[lowerAddress];
-  if (username) {
-    return {
-      found: true,
-      username,
-      address: walletAddress,
-      source: "local",
-    };
-  }
-
   return { found: false, address: walletAddress, source: "none" };
 }
 
@@ -200,15 +133,15 @@ export async function assignUsername(
   username?: string;
   address?: string;
   error?: string;
-  source: "supabase" | "local";
+  source: "supabase" | "none";
 }> {
   const validation = validateUsername(rawUsername);
   if (!validation.valid) {
-    return { success: false, error: validation.error, source: "local" };
+    return { success: false, error: validation.error, source: "none" };
   }
 
   if (!walletAddress || !walletAddress.startsWith("0x") || walletAddress.length !== 42) {
-    return { success: false, error: "Invalid EVM wallet address.", source: "local" };
+    return { success: false, error: "Invalid EVM wallet address.", source: "none" };
   }
 
   const clean = normalizeUsername(rawUsername);
@@ -224,11 +157,10 @@ export async function assignUsername(
     return {
       success: false,
       error: `@${clean} is already claimed by another wallet (${currentResolution.address.slice(0, 6)}...${currentResolution.address.slice(-4)}).`,
-      source: currentResolution.source === "supabase" ? "supabase" : "local",
+      source: "supabase",
     };
   }
 
-  // 1. Primary: Save directly to Supabase
   if (supabase) {
     try {
       // Check if username is taken by a different address (case-insensitive)
@@ -267,14 +199,6 @@ export async function assignUsername(
         };
       }
 
-      // Also mirror to local store as backup
-      const store = readLocalStore();
-      const prevUsername = store.addresses[lowerAddress];
-      if (prevUsername && prevUsername !== clean) delete store.usernames[prevUsername];
-      store.usernames[clean] = lowerAddress;
-      store.addresses[lowerAddress] = clean;
-      writeLocalStore(store);
-
       return {
         success: true,
         username: clean,
@@ -291,20 +215,9 @@ export async function assignUsername(
     }
   }
 
-  // 2. Only if Supabase is unconfigured: Local store
-  const store = readLocalStore();
-  const previousUsername = store.addresses[lowerAddress];
-  if (previousUsername && previousUsername !== clean) {
-    delete store.usernames[previousUsername];
-  }
-  store.usernames[clean] = walletAddress;
-  store.addresses[lowerAddress] = clean;
-  writeLocalStore(store);
-
   return {
-    success: true,
-    username: clean,
-    address: walletAddress,
-    source: "local",
+    success: false,
+    error: "Supabase database client is not configured.",
+    source: "none",
   };
 }
