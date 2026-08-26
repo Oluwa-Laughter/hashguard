@@ -2,17 +2,100 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAccount } from "wagmi";
+import { useAccount, useDisconnect } from "wagmi";
+import { usePathname } from "next/navigation";
 import { WalletButton } from "@/components/wallet-button";
 import { Icon } from "@/components/icons";
 import { hskChain } from "@/lib/chains";
+import { shortAddress } from "@/lib/utils";
+
+const navLinks = [
+  ["Dashboard", "/dashboard"],
+  ["Protected Pay", "/pay"],
+  ["Batch Pay", "/batch"],
+  ["Recurring", "/recurring"],
+  ["Payments", "/payments"],
+  ["AI Agent", "/agent"],
+] as const;
+
+function getIconForLink(label: string) {
+  if (label.includes("Dashboard")) return "user";
+  if (label.includes("Protected")) return "shield";
+  if (label.includes("Batch")) return "layers";
+  if (label.includes("Recurring")) return "history";
+  if (label.includes("Payments")) return "lock";
+  return "spark";
+}
 
 /** Gates workspace routes while preserving current context and providing HSK onboarding utilities. */
 export function AccessGuard({ children }: { children: React.ReactNode }) {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
+  const { disconnect } = useDisconnect();
+  const pathname = usePathname();
   const [addStatus, setAddStatus] = useState<string | null>(null);
 
-  if (isConnected) return <>{children}</>;
+  if (isConnected) {
+    return (
+      <div className="flex min-h-screen bg-[#07090e] text-white">
+        {/* Desktop Sidebar */}
+        <aside className="hidden lg:flex w-64 flex-col justify-between border-r border-white/[0.06] bg-slate-950/45 p-6 flex-shrink-0 sticky top-0 h-screen">
+          <div className="space-y-8">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2.5 font-semibold tracking-tight transition hover:opacity-90">
+              <span className="brand-mark">
+                <Icon name="shield" className="h-4 w-4" />
+              </span>
+              <span className="text-base font-extrabold tracking-tight text-white">
+                <span className="text-emerald-400">Hash</span>Guard
+              </span>
+            </Link>
+
+            {/* Nav links */}
+            <nav className="flex flex-col space-y-1.5 text-sm font-medium text-gray-400">
+              {navLinks.map(([label, href]) => {
+                const active = pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${
+                      active
+                        ? "bg-emerald-500/10 text-emerald-400 font-bold border-l-2 border-emerald-400"
+                        : "hover:bg-white/[0.03] hover:text-white"
+                    }`}
+                  >
+                    <Icon name={getIconForLink(label) as any} className="h-4 w-4" />
+                    {label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Bottom Account details */}
+          <div className="border-t border-white/[0.06] pt-4">
+            <div className="rounded-xl border border-white/[0.04] bg-white/[0.02] p-3 text-xs mb-3">
+              <p className="text-gray-500 font-semibold uppercase tracking-wider text-[9px]">Connected Wallet</p>
+              <p className="font-mono text-gray-300 mt-1 font-bold">{address ? shortAddress(address) : "—"}</p>
+            </div>
+            <button
+              onClick={() => disconnect()}
+              className="w-full button button-secondary py-2 text-xs text-rose-400 border-rose-500/20 hover:bg-rose-500/5"
+            >
+              Disconnect
+            </button>
+          </div>
+        </aside>
+
+        {/* Content Viewport */}
+        <div className="flex-grow flex flex-col min-h-screen min-w-0">
+          <div className="flex-1 w-full">
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   async function handleAddHskChain() {
     if (typeof window === "undefined" || !(window as unknown as { ethereum?: { request: (args: unknown) => Promise<unknown> } }).ethereum) {
@@ -30,8 +113,6 @@ export function AccessGuard({ children }: { children: React.ReactNode }) {
         });
         setAddStatus(`Switched to ${hskChain.name}! Click Connect Wallet.`);
       } catch (switchErr: unknown) {
-        // Code 4902 indicates chain is not yet registered in wallet
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((switchErr as any)?.code === 4902 || String(switchErr).includes("4902") || String(switchErr).includes("Unrecognized")) {
           await ethereum.request({
             method: "wallet_addEthereumChain",
