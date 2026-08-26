@@ -8,6 +8,7 @@ import { AgentIntent } from "@/lib/agent";
 import { usernameRegistryAbi, usernameRegistryAddress } from "@/lib/contracts";
 import { cleanUsername, shortAddress } from "@/lib/utils";
 import { AccessGuard } from "@/components/access-guard";
+import { Icon } from "@/components/icons";
 
 function AgentContent() {
   const [message, setMessage] = useState("");
@@ -17,7 +18,7 @@ function AgentContent() {
   const [busy, setBusy] = useState(false);
   const { address } = useAccount();
   const balance = useBalance({ address });
-  const recipient = intent && intent.action === "protected_transfer" ? intent.recipient : "";
+  const recipient = intent && (intent.action === "protected_transfer" || intent.action === "recurring_payment") ? intent.recipient : "";
 
   const resolution = useReadContract({
     address: usernameRegistryAddress ?? zeroAddress,
@@ -50,10 +51,13 @@ function AgentContent() {
   }
 
   const payHref = intent?.action === "protected_transfer"
-    ? `/pay?recipient=${encodeURIComponent(intent.recipient)}&amount=${intent.amount}&days=${intent.expiryDays}&token=${intent.token}&symbol=${encodeURIComponent(intent.tokenSymbol || (intent.token === "token" ? "USDC" : "HSK"))}`
+    ? `/pay?recipient=${encodeURIComponent(intent.recipient)}&amount=${intent.amount}&days=${intent.expiryDays}&token=${intent.token}`
     : "#";
   const batchHref = intent?.action === "batch_payment"
-    ? `/batch?payments=${encodeURIComponent(JSON.stringify(intent.payments))}&token=${intent.token}&symbol=${encodeURIComponent(intent.tokenSymbol || (intent.token === "token" ? "USDC" : "HSK"))}`
+    ? `/batch?payments=${encodeURIComponent(JSON.stringify(intent.payments))}`
+    : "#";
+  const recurringHref = intent?.action === "recurring_payment"
+    ? `/recurring?recipient=${encodeURIComponent(intent.recipient)}&amount=${intent.amountPerPeriod}&interval=${intent.interval}&periods=${intent.frequencyCount}&token=${intent.token}`
     : "#";
 
   return (
@@ -81,8 +85,8 @@ function AgentContent() {
             <button type="button" className="button-secondary text-sm" onClick={() => setMessage("Pay @alice 1 HSK, @bob 2 HSK and @charlie 0.5 HSK.")}>
               Try batch
             </button>
-            <button type="button" className="button-secondary text-sm text-cyan-300 border-cyan-500/30" onClick={() => setMessage("Pay @alice 100 USDT monthly for the next six months")}>
-              Try recurring (6 mo)
+            <button type="button" className="button-secondary text-sm" onClick={() => setMessage("Send @alice 10 USDC every week for 4 weeks.")}>
+              Try recurring
             </button>
           </div>
         </form>
@@ -124,7 +128,7 @@ function AgentContent() {
                   </div>
                   <div className="flex justify-between">
                     <dt>Amount</dt>
-                    <dd>{intent.amount} {intent.tokenSymbol || (intent.token === "native" ? "HSK" : "USDC")}</dd>
+                    <dd>{intent.amount} {intent.token === "native" ? "HSK" : "USDC"}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt>Protection</dt>
@@ -139,61 +143,42 @@ function AgentContent() {
               <div className="mt-3">
                 <p className="font-semibold">BATCH PAYMENT</p>
                 {intent.payments.map(payment => (
-                  <p key={payment.recipient} className="mt-2 text-sm">{payment.recipient}<span className="float-right">{payment.amount} {intent.tokenSymbol || "HSK"}</span></p>
+                  <p key={payment.recipient} className="mt-2 text-sm">{payment.recipient}<span className="float-right">{payment.amount} HSK</span></p>
                 ))}
                 <Link className="button button-primary mt-5" href={batchHref}>Continue to batch review</Link>
               </div>
             )}
             {intent.action === "recurring_payment" && (
               <div className="mt-3">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold text-white">RECURRING PAYMENT PLAN</p>
-                  <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-[11px] font-bold text-cyan-300">
-                    {intent.frequencyCount} {intent.interval.toUpperCase()} INSTALLMENTS
-                  </span>
-                </div>
-
-                <div className="mt-4 grid gap-2.5 rounded-xl border border-white/[0.06] bg-slate-900/50 p-4 text-sm text-gray-400">
-                  <div className="flex justify-between border-b border-white/[0.04] pb-2">
-                    <span>Recipient</span>
-                    <span className="font-bold text-white">{intent.recipient}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-white/[0.04] pb-2">
-                    <span>Installment Amount</span>
-                    <span className="font-bold text-emerald-400">
-                      {intent.amountPerPeriod} {intent.tokenSymbol} / {intent.interval === "monthly" ? "month" : intent.interval === "weekly" ? "week" : "day"}
-                    </span>
+                <p className="font-semibold">HASHGUARD SCHEDULED PAYMENT</p>
+                <dl className="mt-3 grid gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt>Recipient</dt>
+                    <dd>{intent.recipient}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <span>Total Commitment</span>
-                    <span className="font-extrabold text-white font-mono">
-                      {intent.totalAmount} {intent.tokenSymbol}
-                    </span>
+                    <dt>Resolved address</dt>
+                    <dd>{recipient.startsWith("@") ? (resolution.isLoading ? "Resolving…" : (resolution.data && resolution.data !== zeroAddress ? shortAddress(resolution.data) : "Not resolved on-chain")) : shortAddress(recipient)}</dd>
                   </div>
-                </div>
-
-                <p className="mt-4 text-xs font-bold uppercase tracking-wider text-gray-400">Installment Schedule</p>
-                <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                  {intent.schedule.map((item) => (
-                    <div key={item.period} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-2 text-xs">
-                      <span className="text-gray-400">
-                        #{item.period} · {item.date}
-                      </span>
-                      <span className="font-mono font-bold text-emerald-400">
-                        {item.amount} {intent.tokenSymbol}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
-                  <Link
-                    className="button button-primary flex-1 text-center"
-                    href={`/pay?recipient=${encodeURIComponent(intent.recipient)}&amount=${intent.amountPerPeriod}&days=30&token=${intent.token}&symbol=${encodeURIComponent(intent.tokenSymbol)}`}
-                  >
-                    Lock 1st Installment in Escrow →
-                  </Link>
-                </div>
+                  <div className="flex justify-between">
+                    <dt>Amount Per Period</dt>
+                    <dd>{intent.amountPerPeriod} {intent.tokenSymbol}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt>Interval</dt>
+                    <dd className="capitalize">{intent.interval}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt>Total Periods</dt>
+                    <dd>{intent.frequencyCount} periods</dd>
+                  </div>
+                  <div className="flex justify-between border-t border-white/[0.08] pt-2 font-bold text-emerald-300">
+                    <dt>Upfront Commitment</dt>
+                    <dd>{intent.totalAmount} {intent.tokenSymbol}</dd>
+                  </div>
+                </dl>
+                <p className="mt-4 text-xs text-gray-500">The total amount will be funded and deposited upfront into the schedule contract.</p>
+                <Link className="button button-primary mt-5" href={recurringHref}>Continue to schedule review</Link>
               </div>
             )}
           </section>

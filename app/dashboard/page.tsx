@@ -1,19 +1,46 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-import { formatEther } from "viem";
-import { useAccount, useBalance, useReadContract, useReadContracts } from "wagmi";
+import { formatEther, zeroAddress } from "viem";
+import { useAccount, useBalance, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { hskChain, hskConfigured } from "@/lib/chains";
-import { hashGuardAbi, hashGuardAddress } from "@/lib/contracts";
+import {
+  hashGuardAbi,
+  hashGuardAddress,
+  scheduledPaymentAddress,
+  scheduledPaymentAbi
+} from "@/lib/contracts";
 import { AccessGuard } from "@/components/access-guard";
 import { Icon } from "@/components/icons";
 import { shortAddress } from "@/lib/utils";
 import type { Escrow } from "@/components/escrow-card";
 
+type ScheduleData = {
+  sender: string;
+  recipient: string;
+  token: string;
+  amountPerPeriod: bigint;
+  interval: bigint;
+  totalPeriods: bigint;
+  periodsPaid: bigint;
+  nextPaymentTime: bigint;
+  status: number;
+};
+
 function DashboardContent() {
   const { address } = useAccount();
   const balance = useBalance({ address, query: { enabled: Boolean(address && hskConfigured) } });
+  const [now, setNow] = useState<number>(Math.floor(Date.now() / 1000));
+
+  const { writeContract, data: txHash } = useWriteContract();
+  const txReceipt = useWaitForTransactionReceipt({ hash: txHash });
+
+  // Update current timestamp periodically for execution check countdown
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Read escrow records for active stats
   const total = useReadContract({
@@ -49,12 +76,48 @@ function DashboardContent() {
       ));
   }, [escrows.data, address]);
 
+  // Read active schedules for this user
+  const schedulesCount = useReadContract({
+    address: scheduledPaymentAddress,
+    abi: scheduledPaymentAbi,
+    functionName: "getSchedulesBySender",
+    args: [address ?? zeroAddress],
+    query: { enabled: Boolean(scheduledPaymentAddress && address) }
+  });
+
+  const scheduleIds = useMemo(() => {
+    return (schedulesCount.data || []) as bigint[];
+  }, [schedulesCount.data]);
+
+  const scheduleContracts = useMemo(() => {
+    return scheduleIds.map(id => ({
+      address: scheduledPaymentAddress!,
+      abi: scheduledPaymentAbi,
+      functionName: "getSchedule" as const,
+      args: [id]
+    }));
+  }, [scheduleIds]);
+
+  const scheduleReads = useReadContracts({
+    contracts: scheduleContracts,
+    query: { enabled: Boolean(scheduledPaymentAddress && scheduleContracts.length) }
+  });
+
+  const userSchedules = useMemo(() => {
+    if (!scheduleReads.data) return [];
+    return scheduleReads.data
+      .map((result, idx) => ({
+        id: Number(scheduleIds[idx]),
+        schedule: result.result as ScheduleData
+      }))
+      .filter(item => item.schedule);
+  }, [scheduleReads.data, scheduleIds]);
+
   // Compute metrics
   const stats = useMemo(() => {
     let pending = 0;
     let completed = 0;
     let refundable = 0;
-    const now = Math.floor(Date.now() / 1000);
 
     userItems.forEach(({ escrow }) => {
       if (escrow.status === 0) {
@@ -74,7 +137,7 @@ function DashboardContent() {
       completed,
       refundable
     };
-  }, [userItems, address]);
+  }, [userItems, address, now]);
 
   const recentActivity = useMemo(() => {
     return [...userItems].reverse().slice(0, 5);
@@ -97,7 +160,7 @@ function DashboardContent() {
             Welcome back, {address ? shortAddress(address) : "User"}
           </h1>
           <p className="mt-1 text-sm text-gray-400">
-            Monitor and execute protected payments in real-time.
+            Monitor and execute protected payments and subscription schedules in real-time.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -119,8 +182,8 @@ function DashboardContent() {
         {[
           { label: "Protected Payments", value: stats.total, icon: "shield", color: "text-emerald-400" },
           { label: "Pending Claims", value: stats.pending, icon: "history", color: "text-amber-400" },
-          { label: "Completed", value: stats.completed, icon: "check", color: "text-cyan-400" },
-          { label: "Refundable Escrows", value: stats.refundable, icon: "lock", color: "text-rose-400" }
+          { label: "Completed Payments", value: stats.completed, icon: "check", color: "text-cyan-400" },
+          { label: "Active Subscriptions", value: userSchedules.filter(s => s.schedule.status === 0).length, icon: "layers", color: "text-rose-400" }
         ].map(item => (
           <div key={item.label} className="card relative overflow-hidden">
             <div className="flex items-start justify-between">
@@ -134,6 +197,139 @@ function DashboardContent() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Scheduled Subscriptions Section */}
+      <div className="mt-10">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Your Scheduled Subscription Payments</h2>
+          <Link href="/agent" className="text-xs font-semibold text-emerald-400 hover:text-emerald-300">
+            Create Schedule via AI
+          </Link>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {userSchedules.length === 0 ? (
+            <div className="card text-center py-8 col-span-2">
+              <p className="text-sm text-gray-500">No recurring or scheduled payments created yet.</p>
+              <Link href="/agent" className="mt-3 inline-flex text-xs font-semibold text-emerald-400 hover:text-emerald-300">
+                Tell the agent: &quot;Send Bob 5 USDC weekly for 4 weeks&quot;
+              </Link>
+            </div>
+          ) : (
+            userSchedules.map(({ id, schedule }) => {
+              const statusText = schedule.status === 0 ? "Active" : schedule.status === 1 ? "Cancelled" : "Completed";
+              const statusColor = schedule.status === 0 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : schedule.status === 1 ? "text-rose-400 bg-rose-500/10 border-rose-500/20" : "text-gray-400 bg-gray-500/10 border-gray-500/20";
+              const isDue = schedule.status === 0 && now >= Number(schedule.nextPaymentTime) && Number(schedule.periodsPaid) < Number(schedule.totalPeriods);
+              const tokenSymbol = schedule.token === zeroAddress ? "HSK" : "USDC";
+
+              return (
+                <div key={id} className="card flex flex-col justify-between gap-4 border border-white/[0.05]">
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-gray-500 uppercase">Schedule #{id}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor}`}>
+                        {statusText}
+                      </span>
+                    </div>
+                    
+                    <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold">Recipient</p>
+                        <p className="text-white font-bold mt-0.5">{shortAddress(schedule.recipient)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold">Amount / Period</p>
+                        <p className="text-white font-bold mt-0.5">
+                          {schedule.token === zeroAddress 
+                            ? `${Number(formatEther(schedule.amountPerPeriod)).toFixed(2)} HSK`
+                            : `${Number(schedule.amountPerPeriod) / 10**6} USDC`}
+                        </p>
+                      </div>
+                      <div className="mt-1">
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold">Progress</p>
+                        <p className="text-white font-bold mt-0.5">{Number(schedule.periodsPaid)} / {Number(schedule.totalPeriods)} paid</p>
+                      </div>
+                      <div className="mt-1">
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold">Next Release</p>
+                        <p className="text-white font-bold mt-0.5">
+                          {schedule.status === 0 
+                            ? new Date(Number(schedule.nextPaymentTime) * 1000).toLocaleString()
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Timeline Collapsible details list */}
+                    <div className="mt-4 border-t border-white/[0.04] pt-3">
+                      <details className="group">
+                        <summary className="text-[10px] font-bold text-cyan-400 uppercase cursor-pointer select-none list-none flex items-center justify-between hover:text-cyan-300">
+                          <span>View Release Timeline</span>
+                          <span className="text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div className="mt-2 space-y-1.5 text-xs max-h-32 overflow-y-auto pr-1">
+                          {Array.from({ length: Number(schedule.totalPeriods) }).map((_, idx) => {
+                            const p = idx + 1;
+                            const isPaid = p <= Number(schedule.periodsPaid);
+                            
+                            // Calculate timestamps dynamically relative to schedule state
+                            let releaseTime = 0n;
+                            if (isPaid) {
+                              releaseTime = schedule.nextPaymentTime - BigInt(Number(schedule.periodsPaid) - p + 1) * schedule.interval;
+                            } else {
+                              releaseTime = schedule.nextPaymentTime + BigInt(p - Number(schedule.periodsPaid) - 1) * schedule.interval;
+                            }
+                            
+                            const releaseDateStr = new Date(Number(releaseTime) * 1000).toLocaleString();
+                            
+                            return (
+                              <div key={idx} className="flex justify-between items-center py-0.5 border-b border-white/[0.02] last:border-0">
+                                <span className={isPaid ? "text-gray-500 line-through" : "text-gray-400 font-semibold"}>
+                                  Period #{p} Payout
+                                </span>
+                                <span className={`font-mono font-semibold ${isPaid ? "text-emerald-400" : "text-white"}`}>
+                                  {isPaid ? "Paid ✓" : releaseDateStr}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2.5 mt-2">
+                    {schedule.status === 0 && (
+                      <button
+                        className="button button-secondary flex-1 py-2 text-xs text-rose-400 border-rose-500/20 hover:bg-rose-500/5"
+                        onClick={() => writeContract({
+                          address: scheduledPaymentAddress!,
+                          abi: scheduledPaymentAbi,
+                          functionName: "cancelSchedule",
+                          args: [BigInt(id)]
+                        })}
+                      >
+                        Cancel Schedule
+                      </button>
+                    )}
+                    {isDue && (
+                      <button
+                        className="button button-primary flex-1 py-2 text-xs"
+                        onClick={() => writeContract({
+                          address: scheduledPaymentAddress!,
+                          abi: scheduledPaymentAbi,
+                          functionName: "executePayment",
+                          args: [BigInt(id)]
+                        })}
+                      >
+                        Execute Due Period
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Quick Actions Panel */}
@@ -173,7 +369,7 @@ function DashboardContent() {
       {/* Activity Log */}
       <div className="mt-10">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Recent Activity</h2>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Recent Escrows Activity</h2>
           <Link href="/payments" className="text-xs font-semibold text-emerald-400 hover:text-emerald-300">
             View All History
           </Link>
