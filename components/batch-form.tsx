@@ -57,6 +57,7 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
         name: "Custom ERC-20",
         decimals: 18,
         isNative: false,
+        category: "custom",
       };
     }
     return supportedTokens.find((t) => t.symbol === selectedTokenKey) || NATIVE_HSK;
@@ -253,7 +254,7 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
       <div className="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
         <label className="label">Select Payment Asset</label>
         <select
-          className="field mt-1.5"
+          className="field mt-1.5 font-medium text-white"
           value={selectedTokenKey}
           onChange={(e) => {
             setSelectedTokenKey(e.target.value);
@@ -261,13 +262,72 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
             setTokenApproved(false);
           }}
         >
-          {supportedTokens.map((token) => (
-            <option key={token.symbol} value={token.symbol}>
-              {token.symbol} {token.isNative ? "(Native HSK)" : `(${token.name})`}
-            </option>
-          ))}
-          <option value="CUSTOM">Custom ERC-20 Token…</option>
+          <optgroup label="⚡ Native HSKChain">
+            <option value="HSK">HSK (Native Gas Token)</option>
+          </optgroup>
+          <optgroup label="💵 Global Stablecoins">
+            {supportedTokens
+              .filter((t) => t.category === "stablecoin")
+              .map((t) => (
+                <option key={t.symbol} value={t.symbol}>
+                  {t.symbol} · {t.name}
+                </option>
+              ))}
+          </optgroup>
+          <optgroup label="💎 Crypto Assets">
+            {supportedTokens
+              .filter((t) => t.category === "defi")
+              .map((t) => (
+                <option key={t.symbol} value={t.symbol}>
+                  {t.symbol} · {t.name}
+                </option>
+              ))}
+          </optgroup>
+          <optgroup label="⚙️ Custom">
+            <option value="CUSTOM">Custom ERC-20 Token…</option>
+          </optgroup>
         </select>
+
+        {/* Quick Global Stablecoin Chips */}
+        <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+          <span className="text-[11px] font-semibold text-gray-500 mr-1">Quick Select:</span>
+          {["USDT", "USDC", "DAI", "EURC"].map((sym) => {
+            const isSelected = selectedTokenKey === sym;
+            return (
+              <button
+                key={sym}
+                type="button"
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                  isSelected
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+                    : "bg-white/[0.03] text-gray-400 border border-white/[0.06] hover:bg-white/[0.07] hover:text-white"
+                }`}
+                onClick={() => {
+                  setSelectedTokenKey(sym);
+                  setReview(false);
+                  setTokenApproved(false);
+                }}
+              >
+                {sym}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+              selectedTokenKey === "HSK"
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+                : "bg-white/[0.03] text-gray-400 border border-white/[0.06] hover:bg-white/[0.07] hover:text-white"
+            }`}
+            onClick={() => {
+              setSelectedTokenKey("HSK");
+              setReview(false);
+              setTokenApproved(false);
+            }}
+          >
+            HSK
+          </button>
+        </div>
 
         {isCustomToken && (
           <div className="mt-3">

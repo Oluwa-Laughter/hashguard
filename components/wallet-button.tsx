@@ -2,10 +2,11 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useAccount, useChainId, useConnect, useDisconnect } from "wagmi";
+import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { hskChain, hskConfigured } from "@/lib/chains";
 import { shortAddress } from "@/lib/utils";
 import { Icon } from "@/components/icons";
+import { useUserUsername } from "@/lib/username-client";
 
 // Real-brand SVGs
 const MetaMaskIcon = () => (
@@ -88,6 +89,8 @@ export function WalletButton({ className = "" }: { className?: string }) {
   const chainId = useChainId();
   const { connect, connectors, isPending, error: connectError } = useConnect();
   const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
+  const { username } = useUserUsername(address);
   const [showModal, setShowModal] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
@@ -105,6 +108,31 @@ export function WalletButton({ className = "" }: { className?: string }) {
     }
   }, [isConnected]);
 
+  function handleConnect(connector: (typeof connectors)[number]) {
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const eth = (window as any).ethereum;
+      if (eth?.request) {
+        eth.request({ method: "eth_requestAccounts" }).catch(() => {});
+      }
+    }
+    connect({ connector });
+  }
+
+  function handleDirectBrowser() {
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const eth = (window as any).ethereum;
+      if (eth?.request) {
+        eth.request({ method: "eth_requestAccounts" }).catch(() => {});
+      }
+      const fallback = connectors.find((c) => c.id === "injected") || connectors[0];
+      if (fallback) {
+        connect({ connector: fallback });
+      }
+    }
+  }
+
   const uniqueConnectors = useMemo(() => {
     const filtered = connectors.filter(
       (connector, index, self) =>
@@ -120,41 +148,60 @@ export function WalletButton({ className = "" }: { className?: string }) {
 
   if (isConnected) {
     return (
-      <button
-        className={`wallet-control ${className}`}
-        title="Disconnect wallet"
-        onClick={() => disconnect()}
-      >
-        <span className={`status-dot ${wrongNetwork ? "status-warning" : ""}`} />
-        <span>{wrongNetwork ? "Switch to HSK" : shortAddress(address)}</span>
-      </button>
+      <div className="flex items-center gap-2">
+        {wrongNetwork && (
+          <button
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-300 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 shadow-sm"
+            title="Click to switch network to HSKChain"
+            onClick={() => switchChain({ chainId: hskChain.id })}
+          >
+            <span className="status-dot status-warning" />
+            Switch to {hskChain.name}
+          </button>
+        )}
+        <button
+          className={`wallet-control ${className}`}
+          title={username ? `@${username} (${shortAddress(address)}) · Click to disconnect` : `${shortAddress(address)} · Click to disconnect`}
+          onClick={() => disconnect()}
+        >
+          <span className={`status-dot ${wrongNetwork ? "status-warning" : "bg-emerald-400"}`} />
+          <span className="font-semibold text-xs text-white flex items-center gap-1.5">
+            {username ? (
+              <>
+                <span className="text-emerald-400 font-bold">@{username}</span>
+                <span className="text-[10px] text-gray-500 font-mono hidden sm:inline">({shortAddress(address)})</span>
+              </>
+            ) : (
+              <span className="font-mono">{shortAddress(address)}</span>
+            )}
+          </span>
+        </button>
+      </div>
     );
   }
 
   // Define modal markup to render via Portal
   const modalContent = showModal && (
-    <div className="fixed top-0 left-0 w-full h-full min-h-screen z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto min-h-screen">
       {/* Backdrop */}
       <div
-        className="absolute top-0 left-0 w-full h-full bg-black/80 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity"
         onClick={() => setShowModal(false)}
       />
       
       {/* Modal Container */}
-      <div className="relative w-full max-w-md rounded-2xl border border-white/[0.08] bg-slate-950/95 p-8 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200 text-center z-10 flex flex-col max-h-[90vh]">
+      <div className="relative my-auto w-full max-w-md rounded-2xl border border-white/[0.08] bg-slate-950/98 p-6 sm:p-8 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200 text-left z-10 flex flex-col max-h-[90vh]">
         {/* Highly Visible Close Button */}
         <button
           className="absolute right-5 top-5 rounded-full p-2 bg-white/[0.05] border border-white/[0.08] text-white hover:bg-white/[0.12] active:scale-95 transition-all z-20 flex items-center justify-center"
           onClick={() => setShowModal(false)}
           aria-label="Close modal"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <Icon name="x" className="h-4 w-4" />
         </button>
 
         {/* Header Content */}
-        <div className="flex flex-col items-center mt-2 flex-shrink-0">
+        <div className="flex flex-col items-center mt-2 flex-shrink-0 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
             <Icon name="wallet" className="h-6 w-6" />
           </div>
@@ -162,12 +209,43 @@ export function WalletButton({ className = "" }: { className?: string }) {
             Connect Wallet
           </h3>
           <p className="text-xs text-gray-400 mt-2 max-w-xs leading-relaxed mx-auto">
-            Securely connect your on-chain wallet to interact with HashGuard smart contracts.
+            Securely connect your wallet to interact with HashGuard on {hskChain.name}.
           </p>
         </div>
 
+        {/* Fast Direct Extension Trigger */}
+        <div className="mt-5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={handleDirectBrowser}
+            className="w-full flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 p-3.5 text-left transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                <Icon name="spark" className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="font-bold text-sm text-emerald-400">
+                  Direct Browser Extension
+                </p>
+                <p className="text-[11px] text-gray-400">Pop up active wallet (MetaMask, Phantom, OKX, etc.)</p>
+              </div>
+            </div>
+            <Icon name="arrow" className="h-4 w-4 text-emerald-400 rotate-[-45deg]" />
+          </button>
+        </div>
+
+        <div className="relative my-4 text-center flex-shrink-0">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-white/[0.06]" />
+          </div>
+          <span className="relative bg-slate-950 px-3 text-[10px] uppercase font-bold tracking-wider text-gray-500">
+            Or choose wallet
+          </span>
+        </div>
+
         {/* Connector List (Scrollable Area) */}
-        <div className="mt-6 overflow-y-auto max-h-[380px] pr-1.5 space-y-2.5 scrollbar-thin flex-grow">
+        <div className="overflow-y-auto max-h-[300px] pr-1.5 space-y-2.5 scrollbar-thin flex-grow">
           {uniqueConnectors.length === 0 ? (
             <p className="text-sm text-amber-300 bg-amber-500/10 rounded-xl p-3 border border-amber-500/25">
               No compatible wallet extensions found. Please install MetaMask or Coinbase Wallet.

@@ -20,9 +20,24 @@ export default function PaymentDetailPage() {
   
   return (
     <main className="shell max-w-xl py-10">
-      <h1 className="mb-6 text-3xl font-bold">Protected payment</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Protected payment</h1>
+        <a href={`/claim?id=${id}`} className="text-xs font-bold text-emerald-400 hover:underline">
+          Open Claim Portal →
+        </a>
+      </div>
       {result.isLoading && <p className="muted">Loading payment…</p>}
-      {result.data && <EscrowCard id={id} escrow={result.data as Escrow} />}
+      {result.data && (
+        <div className="space-y-4">
+          <EscrowCard id={id} escrow={result.data as Escrow} />
+          <a
+            href={`/claim?id=${id}`}
+            className="button button-secondary w-full text-center block text-xs font-bold"
+          >
+            Switch to Recipient Claim Experience →
+          </a>
+        </div>
+      )}
       {result.isError && <p className="text-rose-200">This escrow could not be found.</p>}
     </main>
   );

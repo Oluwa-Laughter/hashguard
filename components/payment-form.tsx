@@ -15,6 +15,7 @@ import { cleanUsername, shortAddress } from "@/lib/utils";
 import { TransactionState } from "@/components/transaction-state";
 import { Icon } from "@/components/icons";
 import { getSupportedTokens, isNativeToken, TokenInfo, NATIVE_HSK } from "@/lib/tokens";
+import { resolveUsernameApi } from "@/lib/username-client";
 
 type PaymentFormProps = {
   initial?: {
@@ -68,6 +69,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
         name: "Custom ERC-20",
         decimals: 18,
         isNative: false,
+        category: "custom",
       };
     }
     return supportedTokens.find((t) => t.symbol === selectedTokenKey) || NATIVE_HSK;
@@ -86,8 +88,31 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
     query: { enabled: Boolean(usernameRegistryAddress && resolvingUsername) },
   });
 
+  const [apiResolvedAddress, setApiResolvedAddress] = useState<Address>();
+
+  useEffect(() => {
+    if (!resolvingUsername || !username) {
+      setApiResolvedAddress(undefined);
+      return;
+    }
+    if (resolution.data && resolution.data !== zeroAddress) {
+      setApiResolvedAddress(undefined);
+      return;
+    }
+    let active = true;
+    resolveUsernameApi(username).then((res) => {
+      if (active && res.found && res.address?.startsWith("0x")) {
+        setApiResolvedAddress(res.address as Address);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [resolvingUsername, username, resolution.data]);
+
   const resolved = (directRecipient ||
-    (resolution.data && resolution.data !== zeroAddress ? resolution.data : undefined)) as
+    (resolution.data && resolution.data !== zeroAddress ? resolution.data : undefined) ||
+    apiResolvedAddress) as
     | Address
     | undefined;
 
@@ -317,7 +342,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
           <div className="grid gap-2">
             <label className="label">Select Asset</label>
             <select
-              className="field"
+              className="field font-medium text-white"
               value={selectedTokenKey}
               onChange={(e) => {
                 setSelectedTokenKey(e.target.value);
@@ -325,14 +350,88 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
                 setTokenApproved(false);
               }}
             >
-              {supportedTokens.map((token) => (
-                <option key={token.symbol} value={token.symbol}>
-                  {token.symbol} {token.isNative ? "(Native HSK)" : `(${token.name})`}
-                </option>
-              ))}
-              <option value="CUSTOM">Custom ERC-20 Token…</option>
+              <optgroup label="⚡ Native HSKChain">
+                <option value="HSK">HSK (Native Gas Token)</option>
+              </optgroup>
+              <optgroup label="💵 Global Stablecoins">
+                {supportedTokens
+                  .filter((t) => t.category === "stablecoin")
+                  .map((t) => (
+                    <option key={t.symbol} value={t.symbol}>
+                      {t.symbol} · {t.name}
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="💎 Crypto Assets">
+                {supportedTokens
+                  .filter((t) => t.category === "defi")
+                  .map((t) => (
+                    <option key={t.symbol} value={t.symbol}>
+                      {t.symbol} · {t.name}
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="⚙️ Custom">
+                <option value="CUSTOM">Custom ERC-20 Token…</option>
+              </optgroup>
             </select>
           </div>
+        </div>
+
+        {/* Quick Global Stablecoin Selector Chips */}
+        <div className="flex flex-wrap items-center gap-1.5 -mt-2">
+          <span className="text-[11px] font-semibold text-gray-500 mr-1">Quick Select:</span>
+          {["USDT", "USDC", "DAI", "EURC"].map((sym) => {
+            const isSelected = selectedTokenKey === sym;
+            return (
+              <button
+                key={sym}
+                type="button"
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                  isSelected
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+                    : "bg-white/[0.03] text-gray-400 border border-white/[0.06] hover:bg-white/[0.07] hover:text-white"
+                }`}
+                onClick={() => {
+                  setSelectedTokenKey(sym);
+                  setReviewing(false);
+                  setTokenApproved(false);
+                }}
+              >
+                {sym}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+              selectedTokenKey === "HSK"
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+                : "bg-white/[0.03] text-gray-400 border border-white/[0.06] hover:bg-white/[0.07] hover:text-white"
+            }`}
+            onClick={() => {
+              setSelectedTokenKey("HSK");
+              setReviewing(false);
+              setTokenApproved(false);
+            }}
+          >
+            HSK
+          </button>
+          <button
+            type="button"
+            className={`rounded-lg px-2 py-1 text-[11px] font-medium transition-all ${
+              selectedTokenKey === "CUSTOM"
+                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                : "bg-white/[0.02] text-gray-500 border border-white/[0.04] hover:text-gray-300"
+            }`}
+            onClick={() => {
+              setSelectedTokenKey("CUSTOM");
+              setReviewing(false);
+              setTokenApproved(false);
+            }}
+          >
+            + Custom ERC-20
+          </button>
         </div>
 
         {/* Custom ERC-20 Contract Address Input */}

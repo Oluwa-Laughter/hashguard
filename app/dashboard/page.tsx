@@ -14,6 +14,7 @@ import {
 import { AccessGuard } from "@/components/access-guard";
 import { Icon } from "@/components/icons";
 import { shortAddress } from "@/lib/utils";
+import { useUserUsername } from "@/lib/username-client";
 import type { Escrow } from "@/components/escrow-card";
 
 type ScheduleData = {
@@ -30,6 +31,7 @@ type ScheduleData = {
 
 function DashboardContent() {
   const { address } = useAccount();
+  const { username } = useUserUsername(address);
   const balance = useBalance({ address, query: { enabled: Boolean(address && hskConfigured) } });
   const [now, setNow] = useState<number>(Math.floor(Date.now() / 1000));
 
@@ -156,9 +158,24 @@ function DashboardContent() {
             <span className="text-xs text-gray-500">·</span>
             <span className="text-xs text-gray-400">{networkName}</span>
           </div>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-            Welcome back, {address ? shortAddress(address) : "User"}
-          </h1>
+          <div className="flex items-center gap-3 mt-2 flex-wrap">
+            <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+              Welcome back, {username ? `@${username}` : (address ? shortAddress(address) : "User")}
+            </h1>
+            {username ? (
+              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-0.5 text-xs font-bold text-emerald-300">
+                Verified Handle
+              </span>
+            ) : (
+              <Link
+                href="/username"
+                className="rounded-full border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 px-3 py-0.5 text-xs font-bold text-cyan-300 transition-colors flex items-center gap-1"
+              >
+                <Icon name="spark" className="h-3 w-3" />
+                Claim @username →
+              </Link>
+            )}
+          </div>
           <p className="mt-1 text-sm text-gray-400">
             Monitor and execute protected payments and subscription schedules in real-time.
           </p>
@@ -170,6 +187,10 @@ function DashboardContent() {
               {balance.data ? `${Number(formatEther(balance.data.value)).toFixed(4)} HSK` : "— HSK"}
             </p>
           </div>
+          <Link href="/claim" className="button button-secondary flex items-center gap-1.5">
+            <Icon name="spark" className="h-4 w-4 text-emerald-400" />
+            Claim Payments
+          </Link>
           <Link href="/pay" className="button button-primary">
             <Icon name="shield" className="h-4 w-4" />
             New Payment

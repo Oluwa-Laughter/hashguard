@@ -8,12 +8,13 @@ import { hskChain } from "@/lib/chains";
 import { Icon } from "@/components/icons";
 import { WalletButton } from "@/components/wallet-button";
 
-// App routes for mobile menu inside the workspace
 const workspaceLinks = [
   ["Dashboard", "/dashboard"],
   ["Protected Pay", "/pay"],
+  ["Claim", "/claim"],
   ["Batch Pay", "/batch"],
   ["Recurring", "/recurring"],
+  ["Identity", "/username"],
   ["Payments", "/payments"],
   ["AI Agent", "/agent"],
 ] as const;

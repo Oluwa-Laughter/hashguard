@@ -8,12 +8,19 @@ import {
   scheduledPaymentAbi,
   usernameRegistryAbi,
   usernameRegistryAddress,
-  usdcAddress,
-  erc20Abi
+  erc20Abi,
 } from "@/lib/contracts";
 import { cleanUsername, shortAddress } from "@/lib/utils";
 import { TransactionState } from "@/components/transaction-state";
 import { Icon } from "@/components/icons";
+import { resolveUsernameApi } from "@/lib/username-client";
+import {
+  getSupportedTokens,
+  isNativeToken,
+  TokenInfo,
+  NATIVE_HSK,
+  formatTokenBalance,
+} from "@/lib/tokens";
 
 type RecurringFormProps = {
   initial?: {
@@ -22,56 +29,121 @@ type RecurringFormProps = {
     interval?: string;
     periods?: string;
     token?: "native" | "token";
+    tokenSymbol?: string;
   };
 };
 
 export function RecurringForm({ initial }: RecurringFormProps) {
-  const { isConnected } = useAccount();
+  const supportedTokens = useMemo(() => getSupportedTokens(), []);
+  const { address, isConnected } = useAccount();
+
   const [recipient, setRecipient] = useState(initial?.recipient || "");
   const [amount, setAmount] = useState(initial?.amount || "");
   const [periods, setPeriods] = useState(initial?.periods || "6");
   const [intervalType, setIntervalType] = useState<string>(initial?.interval || "monthly");
-  const [tokenType, setTokenType] = useState<"native" | "token">(initial?.token || "native");
-  const [demoMode, setDemoMode] = useState(true); // Default to true for hackathon judges
+  const [demoMode, setDemoMode] = useState(true); // Default to true for hackathon speed testing
+
+  // Token Selection
+  const [selectedTokenKey, setSelectedTokenKey] = useState<string>(() => {
+    if (initial?.tokenSymbol) {
+      const match = supportedTokens.find(
+        (t) => t.symbol.toLowerCase() === initial.tokenSymbol?.toLowerCase()
+      );
+      if (match) return match.symbol;
+    }
+    return initial?.token === "token" ? "USDT" : "HSK";
+  });
+  const [customTokenAddress, setCustomTokenAddress] = useState<string>("");
 
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState<string>();
   const [tokenApproved, setTokenApproved] = useState(false);
   const [transactionKind, setTransactionKind] = useState<"approve" | "create">();
 
+  const isCustomToken = selectedTokenKey === "CUSTOM";
+  const activeTokenInfo = useMemo<TokenInfo>(() => {
+    if (isCustomToken) {
+      return {
+        address: (customTokenAddress.startsWith("0x") ? customTokenAddress : zeroAddress) as Address,
+        symbol: "CUSTOM",
+        name: "Custom ERC-20",
+        decimals: 18,
+        isNative: false,
+        category: "custom",
+      };
+    }
+    return supportedTokens.find((t) => t.symbol === selectedTokenKey) || NATIVE_HSK;
+  }, [isCustomToken, customTokenAddress, selectedTokenKey, supportedTokens]);
+
+  const isNative = isNativeToken(activeTokenInfo.address);
+  const tokenAddressToUse = isCustomToken ? (customTokenAddress as Address) : activeTokenInfo.address;
+
+  // Custom token Decimals and Symbol queries if custom token
+  const customDecimalsQuery = useReadContract({
+    address: isCustomToken && customTokenAddress.startsWith("0x") ? (customTokenAddress as Address) : zeroAddress,
+    abi: erc20Abi,
+    functionName: "decimals",
+    query: { enabled: isCustomToken && customTokenAddress.startsWith("0x") && customTokenAddress.length === 42 },
+  });
+
+  const customSymbolQuery = useReadContract({
+    address: isCustomToken && customTokenAddress.startsWith("0x") ? (customTokenAddress as Address) : zeroAddress,
+    abi: erc20Abi,
+    functionName: "symbol",
+    query: { enabled: isCustomToken && customTokenAddress.startsWith("0x") && customTokenAddress.length === 42 },
+  });
+
+  const tokenDecimals = isCustomToken ? Number(customDecimalsQuery.data ?? 18) : activeTokenInfo.decimals;
+  const tokenSymbol = isCustomToken ? customSymbolQuery.data || "TOKEN" : activeTokenInfo.symbol;
+
   const username = cleanUsername(recipient);
   const directRecipient = recipient.startsWith("0x") ? (recipient as Address) : undefined;
   const resolvingUsername = Boolean(username && !directRecipient);
 
-  // Resolve username
+  // Resolve username on-chain
   const resolution = useReadContract({
     address: usernameRegistryAddress ?? zeroAddress,
     abi: usernameRegistryAbi,
     functionName: "resolveUsername",
     args: [username],
-    query: { enabled: Boolean(usernameRegistryAddress && resolvingUsername) }
+    query: { enabled: Boolean(usernameRegistryAddress && resolvingUsername) },
   });
 
-  const resolved = (directRecipient || (resolution.data && resolution.data !== zeroAddress ? resolution.data : undefined)) as Address | undefined;
+  const [apiResolvedAddress, setApiResolvedAddress] = useState<Address>();
 
-  // Resolve token decimals
-  const tokenDecimals = useReadContract({
-    address: usdcAddress ?? zeroAddress,
-    abi: erc20Abi,
-    functionName: "decimals",
-    query: { enabled: tokenType === "token" && Boolean(usdcAddress) }
-  });
+  useEffect(() => {
+    if (!resolvingUsername || !username) {
+      setApiResolvedAddress(undefined);
+      return;
+    }
+    if (resolution.data && resolution.data !== zeroAddress) {
+      setApiResolvedAddress(undefined);
+      return;
+    }
+    let active = true;
+    resolveUsernameApi(username).then((res) => {
+      if (active && res.found && res.address?.startsWith("0x")) {
+        setApiResolvedAddress(res.address as Address);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [resolvingUsername, username, resolution.data]);
 
-  const decimals = Number(tokenDecimals.data ?? 6);
+  const resolved = (directRecipient ||
+    (resolution.data && resolution.data !== zeroAddress ? resolution.data : undefined) ||
+    apiResolvedAddress) as Address | undefined;
+
   const { writeContract, data: hash, isPending } = useWriteContract();
   const receipt = useWaitForTransactionReceipt({ hash });
 
   // Map interval type to seconds
   const intervalSeconds = useMemo(() => {
     if (demoMode) {
-      if (intervalType === "daily") return 60n;
-      if (intervalType === "weekly") return 120n;
-      return 180n; // monthly
+      if (intervalType === "daily") return 60n; // 1 min for testing
+      if (intervalType === "weekly") return 120n; // 2 mins for testing
+      return 180n; // 3 mins for testing
     } else {
       if (intervalType === "daily") return 86400n;
       if (intervalType === "weekly") return 604800n;
@@ -79,35 +151,61 @@ export function RecurringForm({ initial }: RecurringFormProps) {
     }
   }, [intervalType, demoMode]);
 
+  const numPeriods = Math.max(1, parseInt(periods || "1", 10));
+
   const parsedAmountPerPeriod = useMemo(() => {
     try {
-      return tokenType === "native"
-        ? parseEther(amount || "0")
-        : parseUnits(amount || "0", decimals);
+      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return 0n;
+      return isNative ? parseEther(amount) : parseUnits(amount, tokenDecimals);
     } catch {
       return 0n;
     }
-  }, [amount, tokenType, decimals]);
+  }, [amount, isNative, tokenDecimals]);
 
   const totalAmount = useMemo(() => {
-    return parsedAmountPerPeriod * BigInt(periods || 0);
-  }, [parsedAmountPerPeriod, periods]);
+    return parsedAmountPerPeriod * BigInt(numPeriods);
+  }, [parsedAmountPerPeriod, numPeriods]);
+
+  // Check ERC-20 Allowance
+  const allowance = useReadContract({
+    address: isNative ? zeroAddress : tokenAddressToUse,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [address ?? zeroAddress, scheduledPaymentAddress ?? zeroAddress],
+    query: {
+      enabled:
+        !isNative &&
+        Boolean(
+          address &&
+            scheduledPaymentAddress &&
+            tokenAddressToUse &&
+            tokenAddressToUse !== zeroAddress
+        ),
+    },
+  });
+
+  const isApproved =
+    isNative ||
+    (allowance.data !== undefined &&
+      allowance.data >= totalAmount &&
+      totalAmount > 0n) ||
+    tokenApproved;
 
   // Compute payment release dates timeline
   const releaseTimeline = useMemo(() => {
     const list = [];
-    const count = Math.min(Number(periods || 0), 100);
+    const count = Math.min(numPeriods, 24);
     const start = Date.now();
     for (let i = 0; i < count; i++) {
       const releaseTime = start + (i + 1) * Number(intervalSeconds) * 1000;
       list.push(new Date(releaseTime).toLocaleString());
     }
     return list;
-  }, [periods, intervalSeconds]);
+  }, [numPeriods, intervalSeconds]);
 
   useEffect(() => {
     if (receipt.error) {
-      setError("The transaction was rejected or could not be completed. Check wallet.");
+      setError("The transaction was rejected or could not be completed. Check your wallet.");
     }
     if (receipt.isSuccess && transactionKind === "approve") {
       setTokenApproved(true);
@@ -119,16 +217,19 @@ export function RecurringForm({ initial }: RecurringFormProps) {
   function review() {
     setError(undefined);
     if (!scheduledPaymentAddress) {
-      return setError("ScheduledPayment contract is not deployed or configured in environment.");
+      return setError("ScheduledPayment contract is not configured in environment.");
     }
     if (!isConnected) {
       return setError("Connect your wallet first.");
     }
     if (!resolved) {
-      return setError(resolvingUsername ? "Recipient @username is not registered." : "Enter a valid address.");
+      return setError(resolvingUsername ? "Recipient @username is not registered." : "Enter a valid recipient.");
     }
-    if (parsedAmountPerPeriod <= 0n || Number(periods) <= 0) {
+    if (parsedAmountPerPeriod <= 0n || numPeriods <= 0) {
       return setError("Please enter a positive amount and periods.");
+    }
+    if (isCustomToken && (!customTokenAddress || !customTokenAddress.startsWith("0x") || customTokenAddress.length !== 42)) {
+      return setError("Please enter a valid 42-character ERC-20 contract address.");
     }
     setReviewing(true);
   }
@@ -137,44 +238,42 @@ export function RecurringForm({ initial }: RecurringFormProps) {
     if (!resolved || !scheduledPaymentAddress) return;
     setError(undefined);
 
-    if (tokenType === "native") {
+    if (isNative) {
       setTransactionKind("create");
       writeContract(
         {
           address: scheduledPaymentAddress,
           abi: scheduledPaymentAbi,
           functionName: "createSchedule",
-          args: [resolved, zeroAddress, parsedAmountPerPeriod, intervalSeconds, BigInt(periods)],
-          value: totalAmount
+          args: [resolved, zeroAddress, parsedAmountPerPeriod, intervalSeconds, BigInt(numPeriods)],
+          value: totalAmount,
         },
-        { onError: () => setError("Wallet creation request rejected.") }
+        { onError: (err) => setError(err.message || "Wallet creation request rejected.") }
       );
-    } else if (usdcAddress) {
-      if (tokenApproved) {
+    } else {
+      if (isApproved) {
         setTransactionKind("create");
         writeContract(
           {
             address: scheduledPaymentAddress,
             abi: scheduledPaymentAbi,
             functionName: "createSchedule",
-            args: [resolved, usdcAddress, parsedAmountPerPeriod, intervalSeconds, BigInt(periods)]
+            args: [resolved, tokenAddressToUse, parsedAmountPerPeriod, intervalSeconds, BigInt(numPeriods)],
           },
-          { onError: () => setError("Wallet creation request rejected.") }
+          { onError: (err) => setError(err.message || "Wallet creation request rejected.") }
         );
       } else {
         setTransactionKind("approve");
         writeContract(
           {
-            address: usdcAddress,
+            address: tokenAddressToUse,
             abi: erc20Abi,
             functionName: "approve",
-            args: [scheduledPaymentAddress, totalAmount]
+            args: [scheduledPaymentAddress, totalAmount],
           },
-          { onError: () => setError("Token approval was rejected.") }
+          { onError: (err) => setError(err.message || "Token approval was rejected.") }
         );
       }
-    } else {
-      setError("No supported token configuration found.");
     }
   }
 
@@ -185,20 +284,25 @@ export function RecurringForm({ initial }: RecurringFormProps) {
           <Icon name="history" className="h-6 w-6 animate-spin-slow" />
         </span>
         <div>
-          <h2 className="text-xl font-bold text-white">Create Scheduled Payment</h2>
+          <h2 className="text-xl font-bold text-white">Create Recurring Payment Schedule</h2>
           <p className="muted mt-1 text-sm leading-relaxed">
-            Fund the entire schedule upfront. Installments are locked in the smart contract and released when they become due.
+            Automate subscriptions, payroll, and recurring retainers using global stablecoins (USDT, USDC, DAI, EURC) or HSK.
           </p>
         </div>
       </div>
 
       <div className="grid gap-5">
+        {/* Recipient */}
         <div className="grid gap-2">
           <label className="label">Recipient Address or @Username</label>
           <input
-            className="field"
+            className="field font-mono text-sm"
             value={recipient}
-            onChange={e => { setRecipient(e.target.value); setReviewing(false); setTokenApproved(false); }}
+            onChange={(e) => {
+              setRecipient(e.target.value);
+              setReviewing(false);
+              setTokenApproved(false);
+            }}
             placeholder="@username or 0x…"
           />
           {resolvingUsername && recipient && (
@@ -211,145 +315,256 @@ export function RecurringForm({ initial }: RecurringFormProps) {
                   @{username} resolved to: {shortAddress(resolved)}
                 </span>
               ) : (
-                <span className="text-rose-400">Username registry not resolved</span>
+                <span className="text-rose-400">Username not found in registry</span>
               )}
             </p>
           )}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-4">
-          <div className="grid gap-2 sm:col-span-1">
+        {/* Amount & Asset Selection */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-2">
             <label className="label">Amount / Period</label>
             <input
-              className="field"
+              className="field font-mono"
               inputMode="decimal"
               value={amount}
-              onChange={e => { setAmount(e.target.value); setTokenApproved(false); }}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setTokenApproved(false);
+              }}
               placeholder="0.00"
             />
           </div>
 
           <div className="grid gap-2">
-            <label className="label">Asset</label>
+            <label className="label">Asset / Stablecoin</label>
             <select
-              className="field"
-              value={tokenType}
-              onChange={e => { setTokenType(e.target.value as "native" | "token"); setReviewing(false); setTokenApproved(false); }}
+              className="field font-medium text-white"
+              value={selectedTokenKey}
+              onChange={(e) => {
+                setSelectedTokenKey(e.target.value);
+                setReviewing(false);
+                setTokenApproved(false);
+              }}
             >
-              <option value="native">HSK (Native)</option>
-              <option value="token" disabled={!usdcAddress}>USDC {usdcAddress ? "" : "(not configured)"}</option>
+              <optgroup label="⚡ Native HSKChain">
+                <option value="HSK">HSK (Native Gas Token)</option>
+              </optgroup>
+              <optgroup label="💵 Global Stablecoins">
+                {supportedTokens
+                  .filter((t) => t.category === "stablecoin")
+                  .map((t) => (
+                    <option key={t.symbol} value={t.symbol}>
+                      {t.symbol} · {t.name}
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="💎 Crypto Assets">
+                {supportedTokens
+                  .filter((t) => t.category === "defi")
+                  .map((t) => (
+                    <option key={t.symbol} value={t.symbol}>
+                      {t.symbol} · {t.name}
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="⚙️ Custom">
+                <option value="CUSTOM">Custom ERC-20 Token…</option>
+              </optgroup>
             </select>
           </div>
+        </div>
 
+        {/* Custom ERC-20 Input */}
+        {isCustomToken && (
+          <div className="rounded-xl border border-white/[0.08] bg-slate-900/60 p-4 animate-in fade-in duration-200">
+            <label className="label text-xs">ERC-20 Token Contract Address (HSKChain)</label>
+            <input
+              className="field mt-1.5 font-mono text-xs"
+              placeholder="0x…"
+              value={customTokenAddress}
+              onChange={(e) => {
+                setCustomTokenAddress(e.target.value.trim());
+                setReviewing(false);
+                setTokenApproved(false);
+              }}
+            />
+            {customSymbolQuery.data && (
+              <p className="mt-2 text-xs text-emerald-400 flex items-center gap-1.5">
+                <Icon name="check" className="h-3 w-3" />
+                Detected Token: <strong>{customSymbolQuery.data}</strong> ({Number(customDecimalsQuery.data ?? 18)} decimals)
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Interval & Periods */}
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-2">
             <label className="label">Frequency</label>
             <select
               className="field text-white"
               value={intervalType}
-              onChange={e => { setIntervalType(e.target.value); setTokenApproved(false); }}
+              onChange={(e) => {
+                setIntervalType(e.target.value);
+                setTokenApproved(false);
+              }}
             >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+              <option value="daily">Daily</option>
             </select>
           </div>
 
           <div className="grid gap-2">
-            <label className="label">Total Periods</label>
+            <label className="label">Total Periods / Installments</label>
             <input
-              className="field"
               type="number"
               min="1"
+              max="60"
+              className="field"
               value={periods}
-              onChange={e => { setPeriods(e.target.value); setTokenApproved(false); }}
+              onChange={(e) => {
+                setPeriods(e.target.value);
+                setTokenApproved(false);
+              }}
             />
           </div>
         </div>
 
-        {/* Demo Mode Toggle */}
-        <div className="flex items-center gap-3 rounded-xl border border-cyan-500/10 bg-cyan-500/[0.02] p-4 text-xs">
-          <input
-            type="checkbox"
-            id="demo-mode"
-            checked={demoMode}
-            onChange={e => { setDemoMode(e.target.checked); setTokenApproved(false); }}
-            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 bg-black/30"
-          />
-          <label htmlFor="demo-mode" className="text-gray-400 font-semibold cursor-pointer">
-            <span className="text-emerald-400 font-bold block mb-0.5">Demo / Hackathon mode (1-3 minute intervals)</span>
-            Accelerate the execution cycle for demonstration purposes (rather than waiting days/weeks).
-          </label>
-        </div>
-      </div>
-
-      {reviewing && resolved && (
-        <div className="mt-6 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.02] p-5 space-y-4">
-          <div>
-            <p className="text-[10px] font-extrabold tracking-widest text-emerald-400 uppercase">Review Commitment Schedule</p>
-            <div className="mt-3 grid gap-2.5 text-sm text-gray-400">
-              <div className="flex justify-between border-b border-white/[0.04] pb-2">
-                <span>Recipient</span>
-                <span className="font-bold text-white">{recipient.startsWith("@") ? recipient : shortAddress(resolved)}</span>
-              </div>
-              <div className="flex justify-between border-b border-white/[0.04] pb-2">
-                <span>Installment Size</span>
-                <span className="font-bold text-white">{amount} {tokenType === "native" ? "HSK" : "USDC"}</span>
-              </div>
-              <div className="flex justify-between border-b border-white/[0.04] pb-2">
-                <span>Interval Timing</span>
-                <span className="font-semibold text-white capitalize">{intervalType} {demoMode && "(Demo Speed: ~1-3m)"}</span>
-              </div>
-              <div className="flex justify-between border-b border-white/[0.04] pb-2">
-                <span>Installments Count</span>
-                <span className="font-semibold text-white">{periods} periods</span>
-              </div>
-              <div className="flex justify-between pt-1 font-bold text-emerald-400 text-base">
-                <span>Upfront Deposit</span>
-                <span>{(Number(amount || 0) * Number(periods || 0))} {tokenType === "native" ? "HSK" : "USDC"}</span>
-              </div>
+        {/* Hackathon Speed Test Mode Toggle */}
+        <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-xs">
+          <div className="flex items-center gap-2">
+            <Icon name="spark" className="h-4 w-4 text-emerald-400" />
+            <div>
+              <p className="font-bold text-white">Hackathon Testing Acceleration</p>
+              <p className="text-[11px] text-gray-400">
+                {demoMode ? "1 Period = 1 to 3 minutes (Speed Test)" : "1 Period = Normal calendar days/months"}
+              </p>
             </div>
           </div>
+          <button
+            type="button"
+            className={`rounded-lg px-2.5 py-1 font-semibold text-[11px] transition-colors ${
+              demoMode
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                : "bg-white/[0.05] text-gray-400 border border-white/[0.08]"
+            }`}
+            onClick={() => setDemoMode(!demoMode)}
+          >
+            {demoMode ? "Accelerated ⚡" : "Real Time ⏱️"}
+          </button>
+        </div>
 
-          {/* Release timeline schedule display */}
-          <div className="border-t border-white/[0.06] pt-4">
-            <p className="text-[10px] font-extrabold tracking-widest text-cyan-400 uppercase mb-3">Installment Release Timeline</p>
-            <div className="max-h-40 overflow-y-auto space-y-2 text-xs pr-2 scrollbar-thin">
-              {releaseTimeline.map((dateStr, idx) => (
-                <div key={idx} className="flex justify-between items-center py-1 border-b border-white/[0.02] last:border-0">
-                  <span className="text-gray-500 font-semibold">Period #{idx + 1} Payout</span>
-                  <span className="font-mono text-white font-semibold">{dateStr}</span>
-                </div>
+        {/* Summary Card */}
+        {amount && Number(amount) > 0 && (
+          <div className="rounded-2xl border border-white/[0.06] bg-slate-950/60 p-4 text-xs space-y-2">
+            <div className="flex justify-between text-gray-400">
+              <span>Installment Plan:</span>
+              <span className="text-white font-semibold">
+                {periods} payments of {amount} {tokenSymbol} ({intervalType})
+              </span>
+            </div>
+            <div className="flex justify-between border-t border-white/[0.04] pt-2 text-sm">
+              <span className="font-bold text-gray-300">Total Commitment:</span>
+              <span className="font-extrabold text-emerald-400 font-mono">
+                {(Number(amount) * numPeriods).toFixed(2).replace(/\.00$/, "")} {tokenSymbol}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-300">
+            {error}
+          </p>
+        )}
+
+        {/* Review & Submit Actions */}
+        {!reviewing ? (
+          <button
+            className="button button-primary w-full"
+            disabled={!amount || Number(amount) <= 0 || !recipient}
+            onClick={review}
+          >
+            Review Recurring Plan
+          </button>
+        ) : (
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5 space-y-4">
+            <h3 className="font-bold text-sm text-emerald-300">Confirm Schedule Deployment</h3>
+            <dl className="grid gap-2 text-xs">
+              <div className="flex justify-between">
+                <dt className="text-gray-400">Designated Recipient:</dt>
+                <dd className="font-mono text-white">{resolved ? shortAddress(resolved) : "—"}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-400">Asset:</dt>
+                <dd className="font-semibold text-emerald-400">{tokenSymbol} ({isNative ? "Native" : "ERC-20"})</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-400">Amount per period:</dt>
+                <dd className="font-mono text-white">{amount} {tokenSymbol}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-400">Total periods:</dt>
+                <dd className="text-white">{periods} installments</dd>
+              </div>
+              <div className="flex justify-between border-t border-white/[0.06] pt-2 font-bold text-sm">
+                <dt className="text-gray-300">Total Lockup:</dt>
+                <dd className="font-mono text-emerald-400">
+                  {(Number(amount) * numPeriods).toFixed(2).replace(/\.00$/, "")} {tokenSymbol}
+                </dd>
+              </div>
+            </dl>
+
+            {/* Timeline preview */}
+            <div className="rounded-lg bg-black/40 p-3 text-[11px] text-gray-400 space-y-1">
+              <p className="font-semibold text-gray-300">First 3 Release Due Dates:</p>
+              {releaseTimeline.slice(0, 3).map((t, idx) => (
+                <p key={idx} className="flex justify-between">
+                  <span>Period #{idx + 1}:</span>
+                  <span className="font-mono text-emerald-300">{t}</span>
+                </p>
               ))}
             </div>
+
+            <div className="flex gap-3">
+              <button
+                className="button button-secondary flex-1"
+                disabled={isPending || receipt.isLoading}
+                onClick={() => setReviewing(false)}
+              >
+                Back
+              </button>
+              <button
+                className="button button-primary flex-1"
+                disabled={isPending || receipt.isLoading}
+                onClick={sign}
+              >
+                {isPending
+                  ? "Awaiting Wallet…"
+                  : receipt.isLoading
+                  ? "Confirming on HSKChain…"
+                  : !isNative && !isApproved
+                  ? `1. Approve ${tokenSymbol} Access`
+                  : `2. Deploy & Fund ${tokenSymbol} Schedule`}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-
-      {error && (
-        <p className="mt-4 rounded-xl border border-rose-500/25 bg-rose-500/10 p-4 text-sm text-rose-300">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <button className="button button-secondary flex-1" onClick={review}>
-          {reviewing ? "Update Review" : "Review Schedule"}
-        </button>
-        {reviewing && (
-          <button
-            className="button button-primary flex-1"
-            disabled={isPending || receipt.isLoading}
-            onClick={sign}
-          >
-            {isPending ? "Awaiting Wallet…" : receipt.isLoading ? "Confirming…" : tokenType === "token" && !tokenApproved ? "Approve Token" : "Create Schedule"}
-          </button>
         )}
-      </div>
 
-      <TransactionState
-        state={hash ? (receipt.isSuccess ? "Schedule Created ✓" : receipt.isLoading ? "Confirming on HSK Chain…" : "Awaiting confirmation…") : undefined}
-        hash={hash}
-      />
+        <TransactionState
+          state={
+            hash
+              ? receipt.isSuccess
+                ? "Schedule Created & Funded ✓"
+                : "Confirming on HSKChain…"
+              : undefined
+          }
+          hash={hash}
+        />
+      </div>
     </div>
   );
 }

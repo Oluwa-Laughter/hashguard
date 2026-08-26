@@ -1,12 +1,17 @@
 import { zeroAddress, type Address, formatUnits, parseUnits } from "viem";
 import { hskChain } from "@/lib/chains";
 
+export type TokenCategory = "native" | "stablecoin" | "defi" | "custom";
+
 export type TokenInfo = {
   address: Address;
   symbol: string;
   name: string;
   decimals: number;
   isNative?: boolean;
+  category: TokenCategory;
+  description?: string;
+  badge?: string;
 };
 
 export const NATIVE_HSK: TokenInfo = {
@@ -15,6 +20,9 @@ export const NATIVE_HSK: TokenInfo = {
   name: "HashKey Token",
   decimals: 18,
   isNative: true,
+  category: "native",
+  description: "Native gas and governance token of HSKChain",
+  badge: "Native Gas",
 };
 
 // Official HSKChain Mainnet token addresses (Chain ID: 177)
@@ -24,45 +32,162 @@ export const MAINNET_TOKENS: Record<string, TokenInfo> = {
     symbol: "USDT",
     name: "Tether USD",
     decimals: 6,
+    category: "stablecoin",
+    description: "Most widely used global USD stablecoin",
+    badge: "Global USD",
   },
   USDC: {
     address: "0x054ed45810DbBAb8B27668922D110669c9D88D0a" as Address,
     symbol: "USDC",
     name: "USD Coin",
     decimals: 6,
+    category: "stablecoin",
+    description: "Regulated digital dollar by Circle",
+    badge: "Circle USD",
+  },
+  DAI: {
+    address: "0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3" as Address,
+    symbol: "DAI",
+    name: "Dai Stablecoin",
+    decimals: 18,
+    category: "stablecoin",
+    description: "Decentralized multi-collateral USD stablecoin",
+    badge: "Decentralized",
+  },
+  EURC: {
+    address: "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c" as Address,
+    symbol: "EURC",
+    name: "Euro Coin",
+    decimals: 6,
+    category: "stablecoin",
+    description: "Euro-backed stablecoin for European & global settlements",
+    badge: "Eurozone",
+  },
+  PYUSD: {
+    address: "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8" as Address,
+    symbol: "PYUSD",
+    name: "PayPal USD",
+    decimals: 6,
+    category: "stablecoin",
+    description: "PayPal digital dollar stablecoin",
+    badge: "PayPal",
+  },
+  FDUSD: {
+    address: "0xc5f0f7b66764F6ec8C8Dff7BA683102295E16409" as Address,
+    symbol: "FDUSD",
+    name: "First Digital USD",
+    decimals: 18,
+    category: "stablecoin",
+    description: "1:1 USD-backed reserve stablecoin",
+    badge: "Exchange",
   },
   WETH: {
     address: "0xefd4bC9afD210517803f293ABABd701CaeeCdfd0" as Address,
     symbol: "WETH",
     name: "Wrapped Ether",
     decimals: 18,
+    category: "defi",
+    description: "EVM-standard wrapped Ethereum",
+    badge: "Crypto Asset",
   },
 };
 
 // Testnet token addresses with environment variable overrides
 export const TESTNET_TOKENS: Record<string, TokenInfo> = {
-  USDC: {
-    address: (process.env.NEXT_PUBLIC_USDC_ADDRESS || "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48") as Address,
-    symbol: "USDC",
-    name: "USD Coin (Testnet)",
-    decimals: 6,
-  },
   USDT: {
     address: (process.env.NEXT_PUBLIC_USDT_ADDRESS || "0xdAC17F958D2ee523a2206206994597C13D831ec7") as Address,
     symbol: "USDT",
     name: "Tether USD (Testnet)",
     decimals: 6,
+    category: "stablecoin",
+    description: "Global standard USD stablecoin",
+    badge: "Global USD",
+  },
+  USDC: {
+    address: (process.env.NEXT_PUBLIC_USDC_ADDRESS || "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48") as Address,
+    symbol: "USDC",
+    name: "USD Coin (Testnet)",
+    decimals: 6,
+    category: "stablecoin",
+    description: "Regulated digital dollar by Circle",
+    badge: "Circle USD",
+  },
+  DAI: {
+    address: (process.env.NEXT_PUBLIC_DAI_ADDRESS || "0x6B175474E89094C44Da98b954EedeAC495271d0F") as Address,
+    symbol: "DAI",
+    name: "Dai Stablecoin (Testnet)",
+    decimals: 18,
+    category: "stablecoin",
+    description: "Decentralized USD stablecoin",
+    badge: "Decentralized",
+  },
+  EURC: {
+    address: (process.env.NEXT_PUBLIC_EURC_ADDRESS || "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c") as Address,
+    symbol: "EURC",
+    name: "Euro Coin (Testnet)",
+    decimals: 6,
+    category: "stablecoin",
+    description: "Euro-backed digital currency",
+    badge: "Eurozone",
+  },
+  WETH: {
+    address: (process.env.NEXT_PUBLIC_WETH_ADDRESS || "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2") as Address,
+    symbol: "WETH",
+    name: "Wrapped Ether (Testnet)",
+    decimals: 18,
+    category: "defi",
+    description: "Wrapped Ether",
+    badge: "Crypto Asset",
   },
 };
 
+/**
+ * Returns all supported tokens for the active network (HSKChain Testnet or Mainnet).
+ */
 export function getSupportedTokens(): TokenInfo[] {
   const isMainnet = hskChain.id === 177;
   const tokenMap = isMainnet ? MAINNET_TOKENS : TESTNET_TOKENS;
   return [NATIVE_HSK, ...Object.values(tokenMap)];
 }
 
+/**
+ * Returns all stablecoins supported on the active network.
+ */
+export function getSupportedStablecoins(): TokenInfo[] {
+  return getSupportedTokens().filter((t) => t.category === "stablecoin");
+}
+
+/**
+ * Finds a token by its symbol (case-insensitive).
+ */
+export function findTokenBySymbol(symbol: string): TokenInfo | undefined {
+  if (!symbol) return undefined;
+  const upper = symbol.toUpperCase();
+  if (upper === "HSK") return NATIVE_HSK;
+  const tokens = getSupportedTokens();
+  return tokens.find((t) => t.symbol.toUpperCase() === upper);
+}
+
+/**
+ * Finds a token by its contract address.
+ */
+export function findTokenByAddress(address: Address | string): TokenInfo | undefined {
+  if (isNativeToken(address)) return NATIVE_HSK;
+  const lower = address.toLowerCase();
+  const tokens = getSupportedTokens();
+  return tokens.find((t) => t.address.toLowerCase() === lower);
+}
+
 export function isNativeToken(address: Address | string): boolean {
   return !address || address.toLowerCase() === zeroAddress.toLowerCase();
+}
+
+export function isStablecoin(token: TokenInfo | string): boolean {
+  if (typeof token === "string") {
+    const found = findTokenBySymbol(token) || findTokenByAddress(token);
+    return found?.category === "stablecoin";
+  }
+  return token.category === "stablecoin";
 }
 
 export function formatTokenBalance(amount: bigint, decimals: number = 18, maxDecimals: number = 4): string {

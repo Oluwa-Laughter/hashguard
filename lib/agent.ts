@@ -80,7 +80,7 @@ export function fallbackIntent(message: string): AgentIntent {
     return { action: "explain_payment" };
   }
 
-  // Detect token symbol
+  // Detect token symbol across global stablecoins and ERC-20s
   let detectedSymbol = "HSK";
   let isErc20 = false;
   if (/\busdt\b/i.test(text)) {
@@ -89,7 +89,19 @@ export function fallbackIntent(message: string): AgentIntent {
   } else if (/\busdc\b/i.test(text)) {
     detectedSymbol = "USDC";
     isErc20 = true;
-  } else if (/\bweth\b/i.test(text)) {
+  } else if (/\bdai\b|\busds\b/i.test(text)) {
+    detectedSymbol = "DAI";
+    isErc20 = true;
+  } else if (/\beurc\b|\beuro\b/i.test(text)) {
+    detectedSymbol = "EURC";
+    isErc20 = true;
+  } else if (/\bpyusd\b/i.test(text)) {
+    detectedSymbol = "PYUSD";
+    isErc20 = true;
+  } else if (/\bfdusd\b/i.test(text)) {
+    detectedSymbol = "FDUSD";
+    isErc20 = true;
+  } else if (/\bweth\b|\beth\b/i.test(text)) {
     detectedSymbol = "WETH";
     isErc20 = true;
   }
@@ -178,9 +190,9 @@ export function fallbackIntent(message: string): AgentIntent {
   }
 
   // Detect protected single payment pattern
-  // Matches: "send 10 USDT to @alice for 5 days" or "pay 1.5 HSK to 0x123... for 7 days"
+  // Matches: "send 10 USDT to @alice for 5 days" or "pay 50 DAI to 0x123... for 7 days"
   const match = text.match(
-    /(?:send|pay)\s+(\d+(?:\.\d+)?)\s*(hsk|usdc|usdt|weth)?\s+(?:to\s+)?(@[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})(?:.*?(?:for\s+)?(\d+)\s*days?)?/i
+    /(?:send|pay)\s+(\d+(?:\.\d+)?)\s*(hsk|usdt|usdc|dai|eurc|pyusd|fdusd|weth)?\s+(?:to\s+)?(@[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})(?:.*?(?:for\s+)?(\d+)\s*days?)?/i
   );
 
   if (match) {

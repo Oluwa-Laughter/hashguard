@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount, useBalance, useReadContract } from "wagmi";
 import { zeroAddress } from "viem";
 import { AgentIntent } from "@/lib/agent";
@@ -9,6 +9,7 @@ import { usernameRegistryAbi, usernameRegistryAddress } from "@/lib/contracts";
 import { cleanUsername, shortAddress } from "@/lib/utils";
 import { AccessGuard } from "@/components/access-guard";
 import { Icon } from "@/components/icons";
+import { resolveUsernameApi } from "@/lib/username-client";
 
 function AgentContent() {
   const [message, setMessage] = useState("");
@@ -27,6 +28,32 @@ function AgentContent() {
     args: [cleanUsername(recipient)],
     query: { enabled: Boolean(recipient.startsWith("@") && usernameRegistryAddress) }
   });
+
+  const [apiResolvedAddress, setApiResolvedAddress] = useState<string>();
+
+  useEffect(() => {
+    if (!recipient.startsWith("@")) {
+      setApiResolvedAddress(undefined);
+      return;
+    }
+    if (resolution.data && resolution.data !== zeroAddress) {
+      setApiResolvedAddress(undefined);
+      return;
+    }
+    let active = true;
+    resolveUsernameApi(recipient).then((res) => {
+      if (active && res.found && res.address?.startsWith("0x")) {
+        setApiResolvedAddress(res.address);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [recipient, resolution.data]);
+
+  const resolvedRecipient =
+    (resolution.data && resolution.data !== zeroAddress ? resolution.data : undefined) ||
+    apiResolvedAddress;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -124,7 +151,7 @@ function AgentContent() {
                   </div>
                   <div className="flex justify-between">
                     <dt>Resolved address</dt>
-                    <dd>{recipient.startsWith("@") ? (resolution.isLoading ? "Resolving…" : (resolution.data && resolution.data !== zeroAddress ? shortAddress(resolution.data) : "Not resolved on-chain")) : shortAddress(recipient)}</dd>
+                    <dd>{recipient.startsWith("@") ? (resolution.isLoading ? "Resolving…" : (resolvedRecipient ? shortAddress(resolvedRecipient) : "Not resolved")) : shortAddress(recipient)}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt>Amount</dt>
