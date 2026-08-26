@@ -1,19 +1,29 @@
+import { type Address } from "viem";
+
 export type AgentIntent =
   | {
+      action: "wallet_balance";
+      tokenSymbol: string;
+    }
+  | {
+      action: "payment_history";
+    }
+  | {
+      action: "explain_payment";
+    }
+  | {
       action: "protected_transfer";
-      recipient: string;
       amount: string;
       token: "native" | "token";
-      tokenSymbol?: string;
-      tokenAddress?: string;
+      tokenSymbol: string;
+      recipient: string;
       expiryDays: number;
     }
   | {
       action: "batch_payment";
       payments: Array<{ recipient: string; amount: string }>;
       token: "native" | "token";
-      tokenSymbol?: string;
-      tokenAddress?: string;
+      tokenSymbol: string;
     }
   | {
       action: "recurring_payment";
@@ -27,23 +37,10 @@ export type AgentIntent =
       schedule: Array<{ period: number; date: string; amount: string }>;
       summary: string;
     }
-  | { action: "wallet_balance"; tokenSymbol?: string }
-  | { action: "payment_history" }
-  | { action: "explain_payment" }
-  | { action: "unknown"; message: string };
-
-/** The browser executes these read/preparation tools; no tool has signing authority. */
-export const agentTools = [
-  "resolve_username",
-  "get_wallet_balance",
-  "get_token_balance",
-  "prepare_protected_payment",
-  "prepare_batch_payment",
-  "prepare_recurring_payment",
-  "get_payment_history",
-  "get_escrow_details",
-  "explain_payment",
-] as const;
+  | {
+      action: "unknown";
+      message: string;
+    };
 
 const numberWords: Record<string, number> = {
   one: 1,
@@ -72,7 +69,7 @@ export function fallbackIntent(message: string): AgentIntent {
     };
   }
 
-  if (/recent|history|payments/.test(lower) && !/send|pay\b/.test(lower)) {
+  if (/recent|history|payments/.test(lower) && !/send|pay|sen\b/.test(lower)) {
     return { action: "payment_history" };
   }
 
@@ -127,11 +124,18 @@ export function fallbackIntent(message: string): AgentIntent {
       count = numberWords[raw] || parseInt(raw, 10) || 6;
     }
 
-    const recipientMatch = text.match(/(@[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})/);
-    const recipient = recipientMatch ? recipientMatch[1] : "@recipient";
+    // Try alternate format: send @recipient [amount] first, fallback to standard
+    const recipientMatch =
+      text.match(/(?:to\s+)?(@[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})/i) ||
+      text.match(/(?:send|pay|sen)\s+([a-zA-Z0-9_@]+)/i);
+    
+    let recipient = recipientMatch ? recipientMatch[1] : "@recipient";
+    if (!recipient.startsWith("@") && !recipient.startsWith("0x")) {
+      recipient = "@" + recipient;
+    }
 
     const amountMatch =
-      text.match(/(?:pay|send)\s+(?:.*?)\s*(\d+(?:\.\d+)?)/i) ||
+      text.match(/(?:pay|send|sen)\s+(?:.*?)\s*(\d+(?:\.\d+)?)/i) ||
       text.match(/(\d+(?:\.\d+)?)\s*(?:hsk|usdc|usdt|weth)/i) ||
       text.match(/(\d+(?:\.\d+)?)/);
 
@@ -179,32 +183,65 @@ export function fallbackIntent(message: string): AgentIntent {
   }
 
   // Detect batch payment pattern (e.g. "@alice 1, @bob 2" or "1 to @alice, 2 to @bob")
-  const batch = [...text.matchAll(/(@[a-zA-Z0-9_]+)\s+(\d+(?:\.\d+)?)/g)];
+  const batch = [...text.matchAll(/(@?[a-zA-Z0-9_]+)\s+(\d+(?:\.\d+)?)/g)];
   if (batch.length > 1) {
     return {
       action: "batch_payment",
       token: isErc20 ? "token" : "native",
       tokenSymbol: detectedSymbol,
-      payments: batch.map((match) => ({ recipient: match[1], amount: match[2] })),
+      payments: batch.map((m) => {
+        let recipient = m[1];
+        if (!recipient.startsWith("@") && !recipient.startsWith("0x")) {
+          recipient = "@" + recipient;
+        }
+        return { recipient, amount: m[2] };
+      }),
     };
   }
 
   // Detect protected single payment pattern
-  // Matches: "send 10 USDT to @alice for 5 days" or "pay 50 DAI to 0x123... for 7 days"
-  const match = text.match(
-    /(?:send|pay)\s+(\d+(?:\.\d+)?)\s*(hsk|usdt|usdc|dai|eurc|pyusd|fdusd|weth)?\s+(?:to\s+)?(@[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})(?:.*?(?:for\s+)?(\d+)\s*days?)?/i
+  // Matches standard: "send 10 HSK to @alice for 5 days"
+  // Matches alternate: "sen @alic 4HSK"
+  const alternateMatch = text.match(
+    /(?:send|pay|sen)\s+(@?[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})\s+(\d+(?:\.\d+)?)\s*(hsk|usdt|usdc|dai|eurc|pyusd|fdusd|weth)?/i
   );
 
-  if (match) {
-    const symbolFromMatch = match[2]?.toUpperCase() || detectedSymbol;
+  if (alternateMatch) {
+    let recipient = alternateMatch[1];
+    if (!recipient.startsWith("@") && !recipient.startsWith("0x")) {
+      recipient = "@" + recipient;
+    }
+    const symbolFromMatch = alternateMatch[3]?.toUpperCase() || detectedSymbol;
+    const isErc = symbolFromMatch !== "HSK";
+
+    return {
+      action: "protected_transfer",
+      amount: alternateMatch[2],
+      token: isErc ? "token" : "native",
+      tokenSymbol: symbolFromMatch,
+      recipient,
+      expiryDays: 7,
+    };
+  }
+
+  const standardMatch = text.match(
+    /(?:send|pay|sen)\s+(\d+(?:\.\d+)?)\s*(hsk|usdt|usdc|dai|eurc|pyusd|fdusd|weth)?\s+(?:to\s+)?(@?[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})(?:.*?(?:for\s+)?(\d+)\s*days?)?/i
+  );
+
+  if (standardMatch) {
+    let recipient = standardMatch[3];
+    if (!recipient.startsWith("@") && !recipient.startsWith("0x")) {
+      recipient = "@" + recipient;
+    }
+    const symbolFromMatch = standardMatch[2]?.toUpperCase() || detectedSymbol;
     const isErc = symbolFromMatch !== "HSK";
     return {
       action: "protected_transfer",
-      amount: match[1],
+      amount: standardMatch[1],
       token: isErc ? "token" : "native",
       tokenSymbol: symbolFromMatch,
-      recipient: match[3],
-      expiryDays: Number(match[4] || 7),
+      recipient,
+      expiryDays: Number(standardMatch[4] || 7),
     };
   }
 
