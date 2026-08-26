@@ -10,6 +10,7 @@ const navLinks = [
   ["Dashboard", "/dashboard"],
   ["Protected Pay", "/pay"],
   ["Batch Pay", "/batch"],
+  ["Recurring", "/recurring"],
   ["Payments", "/payments"],
   ["AI Agent", "/agent"],
 ] as const;
