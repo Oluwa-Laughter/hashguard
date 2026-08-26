@@ -266,6 +266,11 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
               currentUserAddress={address}
               currentUserHandle={currentUserHandle}
               currentTime={currentTime}
+              onClaimSuccess={() => {
+                totalEscrowsQuery.refetch();
+                escrowsQuery.refetch();
+                singleEscrowQuery.refetch();
+              }}
             />
           )}
         </div>
@@ -370,11 +375,13 @@ function DirectClaimCard({
   currentUserAddress,
   currentUserHandle,
   currentTime,
+  onClaimSuccess,
 }: {
   escrow: EscrowItem;
   currentUserAddress?: Address;
   currentUserHandle?: string | null;
   currentTime: number;
+  onClaimSuccess?: () => void;
 }) {
   const isNative = isNativeToken(escrow.token);
 
@@ -416,6 +423,13 @@ function DirectClaimCard({
   // Transaction execution
   const { writeContract, data: hash, isPending, error: claimError } = useWriteContract();
   const receipt = useWaitForTransactionReceipt({ hash });
+
+  // Trigger cache refetch upon successful claim
+  useEffect(() => {
+    if (receipt.isSuccess && onClaimSuccess) {
+      onClaimSuccess();
+    }
+  }, [receipt.isSuccess, onClaimSuccess]);
 
   const isRecipient =
     currentUserAddress && currentUserAddress.toLowerCase() === escrow.recipient.toLowerCase();
