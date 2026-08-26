@@ -81,6 +81,9 @@ function AgentContent() {
             <button type="button" className="button-secondary text-sm" onClick={() => setMessage("Pay @alice 1 HSK, @bob 2 HSK and @charlie 0.5 HSK.")}>
               Try batch
             </button>
+            <button type="button" className="button-secondary text-sm text-cyan-300 border-cyan-500/30" onClick={() => setMessage("Pay @alice 100 USDT monthly for the next six months")}>
+              Try recurring (6 mo)
+            </button>
           </div>
         </form>
         {error && <p className="mt-4 text-sm text-rose-300">{error}</p>}
@@ -139,6 +142,58 @@ function AgentContent() {
                   <p key={payment.recipient} className="mt-2 text-sm">{payment.recipient}<span className="float-right">{payment.amount} {intent.tokenSymbol || "HSK"}</span></p>
                 ))}
                 <Link className="button button-primary mt-5" href={batchHref}>Continue to batch review</Link>
+              </div>
+            )}
+            {intent.action === "recurring_payment" && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-white">RECURRING PAYMENT PLAN</p>
+                  <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-[11px] font-bold text-cyan-300">
+                    {intent.frequencyCount} {intent.interval.toUpperCase()} INSTALLMENTS
+                  </span>
+                </div>
+
+                <div className="mt-4 grid gap-2.5 rounded-xl border border-white/[0.06] bg-slate-900/50 p-4 text-sm text-gray-400">
+                  <div className="flex justify-between border-b border-white/[0.04] pb-2">
+                    <span>Recipient</span>
+                    <span className="font-bold text-white">{intent.recipient}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/[0.04] pb-2">
+                    <span>Installment Amount</span>
+                    <span className="font-bold text-emerald-400">
+                      {intent.amountPerPeriod} {intent.tokenSymbol} / {intent.interval === "monthly" ? "month" : intent.interval === "weekly" ? "week" : "day"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total Commitment</span>
+                    <span className="font-extrabold text-white font-mono">
+                      {intent.totalAmount} {intent.tokenSymbol}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-xs font-bold uppercase tracking-wider text-gray-400">Installment Schedule</p>
+                <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {intent.schedule.map((item) => (
+                    <div key={item.period} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-2 text-xs">
+                      <span className="text-gray-400">
+                        #{item.period} · {item.date}
+                      </span>
+                      <span className="font-mono font-bold text-emerald-400">
+                        {item.amount} {intent.tokenSymbol}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
+                  <Link
+                    className="button button-primary flex-1 text-center"
+                    href={`/pay?recipient=${encodeURIComponent(intent.recipient)}&amount=${intent.amountPerPeriod}&days=30&token=${intent.token}&symbol=${encodeURIComponent(intent.tokenSymbol)}`}
+                  >
+                    Lock 1st Installment in Escrow →
+                  </Link>
+                </div>
               </div>
             )}
           </section>

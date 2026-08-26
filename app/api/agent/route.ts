@@ -25,23 +25,37 @@ Always return ONLY valid JSON adhering strictly to one of the following schemas:
   "tokenSymbol": "HSK" | "USDC" | "USDT" | "WETH"
 }
 
-3. Check Balance:
+3. Recurring Payment Plan (e.g. monthly for 6 months):
+{
+  "action": "recurring_payment",
+  "recipient": "@username or 0x address",
+  "amountPerPeriod": "decimal string (e.g. '100')",
+  "token": "native" | "token",
+  "tokenSymbol": "HSK" | "USDC" | "USDT" | "WETH",
+  "interval": "monthly" | "weekly" | "daily",
+  "frequencyCount": positive integer (e.g. 6),
+  "totalAmount": "decimal string (amountPerPeriod * frequencyCount)",
+  "schedule": [{"period": 1, "date": "Date string", "amount": "decimal string"}],
+  "summary": "concise description of the recurring payment plan"
+}
+
+4. Check Balance:
 {
   "action": "wallet_balance",
   "tokenSymbol": "HSK" | "USDC" | "USDT" | "WETH"
 }
 
-4. Payment History:
+5. Payment History:
 {
   "action": "payment_history"
 }
 
-5. Explain Concept:
+6. Explain Concept:
 {
   "action": "explain_payment"
 }
 
-6. Unknown/Clarification:
+7. Unknown/Clarification:
 {
   "action": "unknown",
   "message": "concise guidance"

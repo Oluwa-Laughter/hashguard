@@ -15,6 +15,18 @@ export type AgentIntent =
       tokenSymbol?: string;
       tokenAddress?: string;
     }
+  | {
+      action: "recurring_payment";
+      recipient: string;
+      amountPerPeriod: string;
+      token: "native" | "token";
+      tokenSymbol: string;
+      interval: "monthly" | "weekly" | "daily";
+      frequencyCount: number;
+      totalAmount: string;
+      schedule: Array<{ period: number; date: string; amount: string }>;
+      summary: string;
+    }
   | { action: "wallet_balance"; tokenSymbol?: string }
   | { action: "payment_history" }
   | { action: "explain_payment" }
@@ -27,10 +39,26 @@ export const agentTools = [
   "get_token_balance",
   "prepare_protected_payment",
   "prepare_batch_payment",
+  "prepare_recurring_payment",
   "get_payment_history",
   "get_escrow_details",
   "explain_payment",
 ] as const;
+
+const numberWords: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+};
 
 export function fallbackIntent(message: string): AgentIntent {
   const text = message.trim();
@@ -66,6 +94,78 @@ export function fallbackIntent(message: string): AgentIntent {
     isErc20 = true;
   }
 
+  // Detect Recurring Payment Intent (e.g. "pay @alice 100 USDT monthly for the next six months")
+  const isRecurring =
+    /recurring|recurrence|monthly|weekly|daily|every month|every week|every day/i.test(text);
+
+  if (isRecurring) {
+    const interval: "monthly" | "weekly" | "daily" = /daily|every day/i.test(text)
+      ? "daily"
+      : /weekly|every week/i.test(text)
+      ? "weekly"
+      : "monthly";
+
+    const countMatch = text.match(
+      /(?:for\s+(?:the\s+next\s+)?|every\s+)(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(?:months?|weeks?|days?)/i
+    );
+
+    let count = 6;
+    if (countMatch) {
+      const raw = countMatch[1].toLowerCase();
+      count = numberWords[raw] || parseInt(raw, 10) || 6;
+    }
+
+    const recipientMatch = text.match(/(@[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})/);
+    const recipient = recipientMatch ? recipientMatch[1] : "@recipient";
+
+    const amountMatch =
+      text.match(/(?:pay|send)\s+(?:.*?)\s*(\d+(?:\.\d+)?)/i) ||
+      text.match(/(\d+(?:\.\d+)?)\s*(?:hsk|usdc|usdt|weth)/i) ||
+      text.match(/(\d+(?:\.\d+)?)/);
+
+    const amountPerPeriod = amountMatch ? amountMatch[1] : "10";
+    const totalCalc = (Number(amountPerPeriod) * count).toFixed(2).replace(/\.00$/, "");
+
+    const schedule: Array<{ period: number; date: string; amount: string }> = [];
+    const now = new Date();
+    for (let i = 1; i <= count; i++) {
+      const d = new Date(now.getTime());
+      if (interval === "monthly") {
+        d.setMonth(d.getMonth() + i);
+      } else if (interval === "weekly") {
+        d.setDate(d.getDate() + i * 7);
+      } else {
+        d.setDate(d.getDate() + i);
+      }
+      const dateStr = d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      schedule.push({
+        period: i,
+        date: dateStr,
+        amount: amountPerPeriod,
+      });
+    }
+
+    const intervalLabel =
+      interval === "monthly" ? "months" : interval === "weekly" ? "weeks" : "days";
+
+    return {
+      action: "recurring_payment",
+      recipient,
+      amountPerPeriod,
+      token: isErc20 ? "token" : "native",
+      tokenSymbol: detectedSymbol,
+      interval,
+      frequencyCount: count,
+      totalAmount: totalCalc,
+      schedule,
+      summary: `Pay ${amountPerPeriod} ${detectedSymbol} ${interval} to ${recipient} for ${count} ${intervalLabel} (Total commitment: ${totalCalc} ${detectedSymbol}).`,
+    };
+  }
+
   // Detect batch payment pattern (e.g. "@alice 1, @bob 2" or "1 to @alice, 2 to @bob")
   const batch = [...text.matchAll(/(@[a-zA-Z0-9_]+)\s+(\d+(?:\.\d+)?)/g)];
   if (batch.length > 1) {
@@ -99,6 +199,6 @@ export function fallbackIntent(message: string): AgentIntent {
   return {
     action: "unknown",
     message:
-      "I can prepare protected single and batch payments (in HSK, USDT, USDC, or custom tokens), check balances, and explain HashGuard escrow protection.",
+      "I can prepare protected single, batch, and recurring payments (in HSK, USDT, USDC, or custom tokens), check balances, and explain HashGuard escrow protection.",
   };
 }

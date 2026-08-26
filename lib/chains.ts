@@ -11,7 +11,7 @@ export const hskTestnet = defineChain({
   blockExplorers: {
     default: {
       name: "HSK Testnet Explorer",
-      url: process.env.NEXT_PUBLIC_EXPLORER_URL || "https://testnet-explorer.hsk.xyz",
+      url: process.env.NEXT_PUBLIC_EXPLORER_URL || "https://testnet-explorer.hskchain.net",
     },
   },
   testnet: true,

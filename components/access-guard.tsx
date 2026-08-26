@@ -21,23 +21,37 @@ export function AccessGuard({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      setAddStatus("Prompting wallet to add HSKChain...");
+      setAddStatus("Prompting wallet to activate HSKChain...");
       const ethereum = (window as unknown as { ethereum: { request: (args: unknown) => Promise<unknown> } }).ethereum;
-      await ethereum.request({
-        method: "wallet_addEthereumChain",
-        params: [
-          {
-            chainId: `0x${hskChain.id.toString(16)}`,
-            chainName: hskChain.name,
-            nativeCurrency: hskChain.nativeCurrency,
-            rpcUrls: hskChain.rpcUrls.default.http,
-            blockExplorerUrls: hskChain.blockExplorers ? [hskChain.blockExplorers.default.url] : undefined,
-          },
-        ],
-      });
-      setAddStatus(`${hskChain.name} added successfully! Click Connect Wallet.`);
+      try {
+        await ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: `0x${hskChain.id.toString(16)}` }],
+        });
+        setAddStatus(`Switched to ${hskChain.name}! Click Connect Wallet.`);
+      } catch (switchErr: unknown) {
+        // Code 4902 indicates chain is not yet registered in wallet
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((switchErr as any)?.code === 4902 || String(switchErr).includes("4902") || String(switchErr).includes("Unrecognized")) {
+          await ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: `0x${hskChain.id.toString(16)}`,
+                chainName: hskChain.name,
+                nativeCurrency: hskChain.nativeCurrency,
+                rpcUrls: hskChain.rpcUrls.default.http,
+                blockExplorerUrls: hskChain.blockExplorers ? [hskChain.blockExplorers.default.url] : undefined,
+              },
+            ],
+          });
+          setAddStatus(`${hskChain.name} registered and activated! Click Connect Wallet.`);
+        } else {
+          throw switchErr;
+        }
+      }
     } catch (err) {
-      setAddStatus(err instanceof Error ? err.message : "Failed to add network to wallet.");
+      setAddStatus(err instanceof Error ? err.message : "Failed to activate network in wallet.");
     }
   }
 

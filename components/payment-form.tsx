@@ -34,7 +34,15 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
   // Form Inputs
   const [recipient, setRecipient] = useState(initial?.recipient || "");
   const [amount, setAmount] = useState(initial?.amount || "");
+
+  // Expiration Date/Duration Control
+  const [expiryMode, setExpiryMode] = useState<"preset" | "date">("preset");
   const [days, setDays] = useState(initial?.days || "7");
+  const [customExpiryDate, setCustomExpiryDate] = useState<string>(() => {
+    const d = new Date(Date.now() + 7 * 86400 * 1000);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  });
+
   const [selectedTokenKey, setSelectedTokenKey] = useState<string>(() => {
     if (initial?.tokenSymbol) {
       const match = supportedTokens.find(
@@ -135,7 +143,32 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
 
   const { writeContract, data: hash, isPending } = useWriteContract();
   const receipt = useWaitForTransactionReceipt({ hash });
-  const expiry = useMemo(() => Math.floor(Date.now() / 1000) + Number(days || 0) * 86400, [days]);
+
+  // Calculate exact expiry timestamp (in seconds)
+  const expiryTimestamp = useMemo(() => {
+    if (expiryMode === "date") {
+      const ts = Math.floor(new Date(customExpiryDate).getTime() / 1000);
+      return isNaN(ts) || ts <= Math.floor(Date.now() / 1000)
+        ? Math.floor(Date.now() / 1000) + 7 * 86400
+        : ts;
+    }
+    return Math.floor(Date.now() / 1000) + Math.max(1, Number(days || 7)) * 86400;
+  }, [expiryMode, customExpiryDate, days]);
+
+  const formattedExpiry = useMemo(() => {
+    return new Date(expiryTimestamp * 1000).toLocaleString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, [expiryTimestamp]);
+
+  const nowFormatted = useMemo(() => {
+    return new Date(Date.now() + 3600000).toISOString().slice(0, 16);
+  }, []);
 
   useEffect(() => {
     if (receipt.error) {
@@ -163,7 +196,10 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
           : "Enter a valid recipient address (0x...) or username (@username)."
       );
     }
-    if (!parsedAmount || Number(days) <= 0) return setError("Enter a positive amount and protection period.");
+    if (!parsedAmount) return setError("Enter a positive amount.");
+    if (expiryTimestamp <= Math.floor(Date.now() / 1000)) {
+      return setError("The expiration date must be in the future.");
+    }
     if (isCustomToken && (!customTokenAddress.startsWith("0x") || customTokenAddress.length !== 42)) {
       return setError("Enter a valid 42-character ERC-20 token address.");
     }
@@ -181,7 +217,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
           address: hashGuardAddress,
           abi: hashGuardAbi,
           functionName: "createNativeEscrow",
-          args: [resolved, BigInt(expiry)],
+          args: [resolved, BigInt(expiryTimestamp)],
           value: parsedAmount,
         },
         { onError: (err) => setError(err.message || "Wallet request was rejected.") }
@@ -195,7 +231,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
             address: hashGuardAddress,
             abi: hashGuardAbi,
             functionName: "createTokenEscrow",
-            args: [targetToken, resolved, parsedAmount, BigInt(expiry)],
+            args: [targetToken, resolved, parsedAmount, BigInt(expiryTimestamp)],
           },
           { onError: (err) => setError(err.message || "Escrow creation was rejected.") }
         );
@@ -224,7 +260,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
           <h2 className="text-xl font-bold text-white">Send Protected Payment</h2>
           <p className="muted mt-1 text-sm leading-relaxed">
             Lock funds securely inside HashGuard escrow for native HSK or any ERC-20 token (USDC, USDT, WETH).
-            Recipients claim on-chain, or senders can reclaim funds once the protection period expires.
+            Set the exact expiration date — recipients claim on-chain, or senders can reclaim funds once expired.
           </p>
         </div>
       </div>
@@ -261,8 +297,8 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
           )}
         </div>
 
-        {/* Amount, Asset & Expiry */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        {/* Amount & Asset */}
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-2">
             <label className="label">Amount</label>
             <input
@@ -297,27 +333,6 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
               <option value="CUSTOM">Custom ERC-20 Token…</option>
             </select>
           </div>
-
-          <div className="grid gap-2">
-            <label className="label">Escrow Protection</label>
-            <div className="relative flex items-center">
-              <input
-                className="field"
-                type="number"
-                min="1"
-                max="365"
-                value={days}
-                onChange={(e) => {
-                  setDays(e.target.value);
-                  setTokenApproved(false);
-                  setReviewing(false);
-                }}
-              />
-              <span className="absolute right-4 text-xs font-semibold text-gray-500 pointer-events-none mt-1">
-                days
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* Custom ERC-20 Contract Address Input */}
@@ -341,6 +356,109 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
             )}
           </div>
         )}
+
+        {/* Expiration Date Selection Controls */}
+        <div className="rounded-xl border border-white/[0.06] bg-slate-900/40 p-4">
+          <div className="flex items-center justify-between">
+            <label className="label text-xs uppercase tracking-wider text-emerald-400">
+              Escrow Protection Expiry
+            </label>
+            <div className="flex gap-1.5 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setExpiryMode("preset");
+                  setReviewing(false);
+                }}
+                className={`rounded-lg px-2.5 py-1 font-semibold transition ${
+                  expiryMode === "preset"
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    : "text-gray-500 hover:text-white"
+                }`}
+              >
+                Quick Presets
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setExpiryMode("date");
+                  setReviewing(false);
+                }}
+                className={`rounded-lg px-2.5 py-1 font-semibold transition ${
+                  expiryMode === "date"
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    : "text-gray-500 hover:text-white"
+                }`}
+              >
+                Exact Date & Time
+              </button>
+            </div>
+          </div>
+
+          {expiryMode === "preset" ? (
+            <div className="mt-3">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: "1 Day", val: "1" },
+                  { label: "3 Days", val: "3" },
+                  { label: "7 Days (Standard)", val: "7" },
+                  { label: "14 Days", val: "14" },
+                  { label: "30 Days (Month)", val: "30" },
+                ].map((preset) => (
+                  <button
+                    key={preset.val}
+                    type="button"
+                    onClick={() => {
+                      setDays(preset.val);
+                      setReviewing(false);
+                    }}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                      days === preset.val
+                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
+                        : "border-white/[0.06] bg-white/[0.02] text-gray-400 hover:border-white/20 hover:text-white"
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-gray-500">Or custom days:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  className="field w-24 py-1 text-xs"
+                  value={days}
+                  onChange={(e) => {
+                    setDays(e.target.value);
+                    setReviewing(false);
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3">
+              <label className="text-xs text-gray-400">Select Expiration Date & Time:</label>
+              <input
+                type="datetime-local"
+                min={nowFormatted}
+                className="field mt-1.5"
+                value={customExpiryDate}
+                onChange={(e) => {
+                  setCustomExpiryDate(e.target.value);
+                  setReviewing(false);
+                }}
+              />
+            </div>
+          )}
+
+          {/* Live Expiration Display */}
+          <div className="mt-3 flex items-center justify-between border-t border-white/[0.04] pt-2.5 text-xs">
+            <span className="text-gray-500">Refund available after:</span>
+            <span className="font-semibold text-emerald-400">{formattedExpiry}</span>
+          </div>
+        </div>
       </div>
 
       {/* Review Box */}
@@ -373,8 +491,8 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
               </span>
             </div>
             <div className="flex justify-between">
-              <span>Protection Period</span>
-              <span className="font-semibold text-white">{days} days (refundable thereafter)</span>
+              <span>Protection Expiry Date</span>
+              <span className="font-semibold text-white">{formattedExpiry} (Refundable thereafter)</span>
             </div>
           </div>
           <p className="mt-4 border-t border-white/[0.06] pt-4 text-xs text-gray-500 leading-relaxed">
