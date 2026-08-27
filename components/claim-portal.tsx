@@ -15,7 +15,7 @@ import { shortAddress } from "@/lib/utils";
 import { formatTokenBalance, isNativeToken } from "@/lib/tokens";
 import { Icon } from "@/components/icons";
 import { TransactionState } from "@/components/transaction-state";
-import { getUsernameByAddressApi, useUserUsername } from "@/lib/username-client";
+import { getUsernameByAddressApi, resolveUsernameApi, useUserUsername } from "@/lib/username-client";
 
 export type EscrowItem = {
   id: number;
@@ -34,9 +34,8 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
   const { username: currentUserHandle } = useUserUsername(address);
 
   // Search & active selection
-  const [lookupInput, setLookupInput] = useState<string>(
-    initialEscrowId !== undefined ? String(initialEscrowId) : ""
-  );
+  const [senderQuery, setSenderQuery] = useState("");
+  const [resolvedFilterAddress, setResolvedFilterAddress] = useState<string>();
   const [selectedId, setSelectedId] = useState<number | undefined>(initialEscrowId);
   const [activeTab, setActiveTab] = useState<"claimable" | "all">("claimable");
   const [currentTime, setCurrentTime] = useState<number>(Math.floor(Date.now() / 1000));
@@ -51,9 +50,45 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
   useEffect(() => {
     if (initialEscrowId !== undefined) {
       setSelectedId(initialEscrowId);
-      setLookupInput(String(initialEscrowId));
     }
   }, [initialEscrowId]);
+
+  // Resolve sender query to address
+  useEffect(() => {
+    const q = senderQuery.trim();
+    if (!q) {
+      setResolvedFilterAddress(undefined);
+      return;
+    }
+    if (q.startsWith("0x")) {
+      setResolvedFilterAddress(q.toLowerCase());
+      return;
+    }
+
+    let active = true;
+    resolveUsernameApi(q).then((res) => {
+      if (active) {
+        if (res.found && res.address) {
+          setResolvedFilterAddress(res.address.toLowerCase());
+        } else {
+          // Try lookup with prefix fallback
+          resolveUsernameApi("@" + q).then((r) => {
+            if (active) {
+              if (r.found && r.address) {
+                setResolvedFilterAddress(r.address.toLowerCase());
+              } else {
+                setResolvedFilterAddress("not_found");
+              }
+            }
+          });
+        }
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [senderQuery]);
 
   // Read nextEscrowId to know how many escrows exist
   const totalEscrowsQuery = useReadContract({
@@ -114,12 +149,19 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
       .reverse();
   }, [escrowsQuery.data, address]);
 
-  // Filter claimable escrows (status == 0)
+  // Apply filters
   const claimableEscrows = useMemo(() => {
-    return allUserEscrows.filter((e) => e.status === 0);
-  }, [allUserEscrows]);
+    const active = allUserEscrows.filter((e) => e.status === 0);
+    if (!resolvedFilterAddress) return active;
+    return active.filter((e) => e.sender.toLowerCase() === resolvedFilterAddress);
+  }, [allUserEscrows, resolvedFilterAddress]);
 
-  const displayedEscrows = activeTab === "claimable" ? claimableEscrows : allUserEscrows;
+  const filteredAllEscrows = useMemo(() => {
+    if (!resolvedFilterAddress) return allUserEscrows;
+    return allUserEscrows.filter((e) => e.sender.toLowerCase() === resolvedFilterAddress);
+  }, [allUserEscrows, resolvedFilterAddress]);
+
+  const displayedEscrows = activeTab === "claimable" ? claimableEscrows : filteredAllEscrows;
 
   // Single escrow query for direct search/lookup
   const singleEscrowQuery = useReadContract({
@@ -158,13 +200,11 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
         <div>
           <div className="flex items-center gap-2">
             <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
-              <Icon name="spark" className="h-3.5 w-3.5" />
+              <Icon name="shield" className="h-4 w-4" />
             </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-              Recipient Claim Portal
-            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Recipient Claim Portal</span>
           </div>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-extrabold text-white">
+          <h1 className="text-3xl font-extrabold tracking-tight text-white mt-1.5">
             Claim Your Protected Payments
           </h1>
           <p className="mt-1 text-sm text-gray-400">
@@ -186,60 +226,36 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
         )}
       </div>
 
-      {/* Lookup by ID Bar */}
+      {/* Filter by Sender bar */}
       <div className="rounded-2xl border border-white/[0.08] bg-slate-950/60 p-5 backdrop-blur-xl shadow-lg">
         <label className="label text-xs uppercase font-bold tracking-wider text-gray-300">
-          Find Payment by Escrow ID or Claim Link
+          Search Incoming Claims by Sender Username or Wallet Address
         </label>
-        <div className="mt-2 flex flex-col sm:flex-row gap-2.5">
+        <div className="mt-2 flex gap-2.5">
           <div className="relative flex-1">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">
-              #
-            </span>
             <input
-              type="number"
-              min={0}
-              className="field pl-8 font-mono text-sm"
-              placeholder="e.g. 0, 1, 5, 42..."
-              value={lookupInput}
-              onChange={(e) => setLookupInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const val = parseInt(lookupInput.trim(), 10);
-                  if (!isNaN(val) && val >= 0) setSelectedId(val);
-                }
-              }}
+              type="text"
+              className="field font-medium text-sm"
+              placeholder="e.g. @admin, @alice, or 0x..."
+              value={senderQuery}
+              onChange={(e) => setSenderQuery(e.target.value)}
             />
           </div>
-          <button
-            type="button"
-            className="button button-secondary flex items-center justify-center gap-2 sm:w-auto"
-            onClick={() => {
-              const val = parseInt(lookupInput.trim(), 10);
-              if (!isNaN(val) && val >= 0) {
-                setSelectedId(val);
-              }
-            }}
-          >
-            <Icon name="arrow" className="h-4 w-4" />
-            Inspect Escrow
-          </button>
-          {selectedId !== undefined && (
+          {senderQuery !== "" && (
             <button
               type="button"
-              className="button button-ghost text-xs text-gray-400 hover:text-white"
+              className="button button-secondary text-xs"
               onClick={() => {
-                setSelectedId(undefined);
-                setLookupInput("");
+                setSenderQuery("");
               }}
             >
-              Clear
+              Clear Search
             </button>
           )}
         </div>
       </div>
 
-      {/* Featured Inspected Escrow Card (If user searched or opened /claim?id=X) */}
+      {/* Featured Inspected Escrow Card (If user selected one) */}
       {selectedId !== undefined && (
         <div className="animate-in fade-in zoom-in-95 duration-200">
           <div className="flex items-center justify-between mb-3">
@@ -247,6 +263,13 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
               <Icon name="shield" className="h-4 w-4" />
               Direct Payment View: Escrow #{selectedId}
             </span>
+            <button
+              type="button"
+              className="text-xs text-gray-400 hover:text-white"
+              onClick={() => setSelectedId(undefined)}
+            >
+              Close View
+            </button>
           </div>
 
           {singleEscrowQuery.isLoading ? (
@@ -310,7 +333,7 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
               }`}
               onClick={() => setActiveTab("all")}
             >
-              All Incoming ({allUserEscrows.length})
+              All Incoming ({filteredAllEscrows.length})
             </button>
           </div>
         </div>
@@ -342,12 +365,6 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
                 ? "You have no unclaimed escrows waiting. New payments sent to your address or handle will appear here instantly."
                 : "No escrows have been created for your wallet address yet. Senders can pay you using your address or @username."}
             </p>
-            {currentUserHandle && (
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs text-emerald-300 font-semibold">
-                Share your payment link:{" "}
-                <code className="text-white">/pay?recipient=@{currentUserHandle}</code>
-              </div>
-            )}
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
@@ -656,7 +673,6 @@ function InboxEscrowCard({
   }, [escrow.sender]);
 
   const isPending = escrow.status === 0;
-  const isExpired = Number(escrow.expiry) <= currentTime;
 
   return (
     <div

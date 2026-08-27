@@ -12,7 +12,7 @@ import {
   usernameRegistryAbi,
   usernameRegistryAddress,
 } from "@/lib/contracts";
-import { cleanUsername, shortAddress } from "@/lib/utils";
+import { cleanUsername, shortAddress, formatFriendlyError } from "@/lib/utils";
 import { TransactionState } from "@/components/transaction-state";
 import { Icon } from "@/components/icons";
 import { getSupportedTokens, isNativeToken, TokenInfo, NATIVE_HSK } from "@/lib/tokens";
@@ -246,7 +246,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
           args: [resolved, BigInt(expiryTimestamp)],
           value: parsedAmount,
         },
-        { onError: (err) => setError(err.message || "Wallet request was rejected.") }
+        { onError: (err) => setError(formatFriendlyError(err) || "Wallet request was rejected.") }
       );
     } else {
       const targetToken = isCustomToken ? (customTokenAddress as Address) : activeTokenInfo.address;
@@ -259,7 +259,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
             functionName: "createTokenEscrow",
             args: [targetToken, resolved, parsedAmount, BigInt(expiryTimestamp)],
           },
-          { onError: (err) => setError(err.message || "Escrow creation was rejected.") }
+          { onError: (err) => setError(formatFriendlyError(err) || "Escrow creation was rejected.") }
         );
       } else {
         setTransactionKind("approve");
@@ -270,7 +270,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
             functionName: "approve",
             args: [hashGuardAddress, parsedAmount],
           },
-          { onError: (err) => setError(err.message || `Approval for ${tokenSymbol} was rejected.`) }
+          { onError: (err) => setError(formatFriendlyError(err) || `Approval for ${tokenSymbol} was rejected.`) }
         );
       }
     }
@@ -441,7 +441,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
         {/* Quick Global Stablecoin Selector Chips */}
         <div className="flex flex-wrap items-center gap-1.5 -mt-2">
           <span className="text-[11px] font-semibold text-gray-500 mr-1">Quick Select:</span>
-          {["USDT", "USDC", "DAI", "EURC"].map((sym) => {
+          {["USDT", "USDC", "WETH", "WBTC", "WHSK"].map((sym) => {
             const isSelected = selectedTokenKey === sym;
             return (
               <button
@@ -662,7 +662,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
       )}
 
       {error && (
-        <p className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-300">
+        <p className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3.5 text-xs text-rose-300 break-words w-full overflow-hidden leading-relaxed">
           {error}
         </p>
       )}

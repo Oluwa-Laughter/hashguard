@@ -11,7 +11,7 @@ import {
   usernameRegistryAbi,
   usernameRegistryAddress,
 } from "@/lib/contracts";
-import { cleanUsername, asAddress, shortAddress } from "@/lib/utils";
+import { cleanUsername, asAddress, shortAddress, formatFriendlyError } from "@/lib/utils";
 import { TransactionState } from "@/components/transaction-state";
 import { Icon } from "@/components/icons";
 import { getSupportedTokens, isNativeToken, TokenInfo, NATIVE_HSK } from "@/lib/tokens";
@@ -206,7 +206,7 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
           args: [recipients, amounts],
           value: total,
         },
-        { onError: (err) => setError(err.message || "Batch wallet request failed.") }
+        { onError: (err) => setError(formatFriendlyError(err) || "Batch wallet request failed.") }
       );
     } else {
       const targetToken = isCustomToken ? (customTokenAddress as Address) : activeTokenInfo.address;
@@ -219,7 +219,7 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
             functionName: "batchTokenPayment",
             args: [targetToken, recipients, amounts],
           },
-          { onError: (err) => setError(err.message || "Batch token payment failed.") }
+          { onError: (err) => setError(formatFriendlyError(err) || "Batch token payment failed.") }
         );
       } else {
         setTransactionKind("approve");
@@ -230,7 +230,7 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
             functionName: "approve",
             args: [hashGuardAddress, total],
           },
-          { onError: (err) => setError(err.message || `Approval for ${tokenSymbol} was rejected.`) }
+          { onError: (err) => setError(formatFriendlyError(err) || `Approval for ${tokenSymbol} was rejected.`) }
         );
       }
     }
@@ -346,7 +346,7 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
         {/* Quick Global Stablecoin Chips */}
         <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
           <span className="text-[11px] font-semibold text-gray-500 mr-1">Quick Select:</span>
-          {["USDT", "USDC", "DAI", "EURC"].map((sym) => {
+          {["USDT", "USDC", "WETH", "WBTC", "WHSK"].map((sym) => {
             const isSelected = selectedTokenKey === sym;
             return (
               <button
@@ -503,7 +503,7 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
       )}
 
       {error && (
-        <p className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-300">
+        <p className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3.5 text-xs text-rose-300 break-words w-full overflow-hidden leading-relaxed">
           {error}
         </p>
       )}

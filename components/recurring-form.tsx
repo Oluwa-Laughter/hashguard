@@ -11,7 +11,7 @@ import {
   usernameRegistryAddress,
   erc20Abi,
 } from "@/lib/contracts";
-import { cleanUsername, shortAddress } from "@/lib/utils";
+import { cleanUsername, shortAddress, formatFriendlyError } from "@/lib/utils";
 import { TransactionState } from "@/components/transaction-state";
 import { Icon } from "@/components/icons";
 import { resolveUsernameApi } from "@/lib/username-client";
@@ -249,7 +249,7 @@ export function RecurringForm({ initial }: RecurringFormProps) {
           args: [resolved, zeroAddress, parsedAmountPerPeriod, intervalSeconds, BigInt(numPeriods)],
           value: totalAmount,
         },
-        { onError: (err) => setError(err.message || "Wallet creation request rejected.") }
+        { onError: (err) => setError(formatFriendlyError(err) || "Wallet creation request rejected.") }
       );
     } else {
       if (isApproved) {
@@ -261,7 +261,7 @@ export function RecurringForm({ initial }: RecurringFormProps) {
             functionName: "createSchedule",
             args: [resolved, tokenAddressToUse, parsedAmountPerPeriod, intervalSeconds, BigInt(numPeriods)],
           },
-          { onError: (err) => setError(err.message || "Wallet creation request rejected.") }
+          { onError: (err) => setError(formatFriendlyError(err) || "Wallet creation request rejected.") }
         );
       } else {
         setTransactionKind("approve");
@@ -272,7 +272,7 @@ export function RecurringForm({ initial }: RecurringFormProps) {
             functionName: "approve",
             args: [scheduledPaymentAddress, totalAmount],
           },
-          { onError: (err) => setError(err.message || "Token approval was rejected.") }
+          { onError: (err) => setError(formatFriendlyError(err) || "Token approval was rejected.") }
         );
       }
     }
@@ -517,7 +517,7 @@ export function RecurringForm({ initial }: RecurringFormProps) {
         )}
 
         {error && (
-          <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-300">
+          <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3.5 text-xs text-rose-300 break-words w-full overflow-hidden leading-relaxed">
             {error}
           </p>
         )}
@@ -591,8 +591,8 @@ export function RecurringForm({ initial }: RecurringFormProps) {
                   : receipt.isLoading
                   ? "Confirming on HSKChain…"
                   : !isNative && !isApproved
-                  ? `1. Approve ${tokenSymbol} Access`
-                  : `2. Deploy & Fund ${tokenSymbol} Schedule`}
+                  ? `Approve ${tokenSymbol} Access`
+                  : `Schedule ${tokenSymbol} Payments`}
               </button>
             </div>
           </div>
