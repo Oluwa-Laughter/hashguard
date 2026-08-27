@@ -633,9 +633,12 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
                 {recipient.startsWith("@") ? recipient : shortAddress(resolved)}
               </span>
             </div>
-            <div className="flex justify-between border-b border-white/[0.04] pb-2">
-              <span>Resolved Address</span>
-              <span className="font-mono text-xs text-white">{resolved}</span>
+            <div className="flex justify-between items-center gap-2 border-b border-white/[0.04] pb-2">
+              <span className="shrink-0">Resolved Address</span>
+              <span className="font-mono text-xs text-white text-right">
+                <span className="sm:hidden">{shortAddress(resolved)}</span>
+                <span className="hidden sm:inline">{resolved}</span>
+              </span>
             </div>
             <div className="flex justify-between border-b border-white/[0.04] pb-2">
               <span>Escrow Value</span>

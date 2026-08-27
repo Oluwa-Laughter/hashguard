@@ -20,8 +20,8 @@ export default function PaymentDetailPage() {
   
   return (
     <main className="shell max-w-xl py-10">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Protected payment</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Protected Payment</h1>
         <a href={`/claim?id=${id}`} className="text-xs font-bold text-emerald-400 hover:underline">
           Open Claim Portal →
         </a>

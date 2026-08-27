@@ -269,7 +269,7 @@ function UsernameContent() {
             {clean.length >= 3 && availabilityStatus.available && (
               <div className="mt-4 rounded-xl border border-white/[0.04] bg-white/[0.02] p-3 text-xs text-gray-400">
                 <span className="font-semibold text-gray-300">Preview Permanent Mapping:</span>
-                <p className="mt-1 font-mono text-emerald-400">
+                <p className="mt-1 font-mono text-emerald-400 break-all">
                   @{clean} ➔ {address || "Connect wallet"}
                 </p>
               </div>

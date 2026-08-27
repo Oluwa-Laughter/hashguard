@@ -2,7 +2,13 @@ import type { Config } from "tailwindcss";
 
 export default {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
-  theme: { extend: {} },
-  plugins: []
+  theme: {
+    extend: {
+      screens: {
+        xs: "480px",
+      },
+    },
+  },
+  plugins: [],
 } satisfies Config;
 

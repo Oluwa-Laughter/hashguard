@@ -108,7 +108,7 @@ export function Header() {
 
       {/* Mobile Drawer Overlay */}
       {mobileMenuOpen && (
-        <div className="lg:hidden absolute top-[71px] left-0 w-full border-b border-white/[0.06] bg-slate-950/95 backdrop-blur-xl animate-in slide-in-from-top-4 duration-200">
+        <div className="lg:hidden absolute top-[71px] left-0 w-full border-b border-white/[0.06] bg-slate-950/95 backdrop-blur-xl animate-in slide-in-from-top-4 duration-200 max-h-[calc(100vh-75px)] overflow-y-auto">
           <nav className="flex flex-col p-5 space-y-4 text-sm font-semibold">
             {navLinks.map(([label, href]) => {
               const active = pathname === href;

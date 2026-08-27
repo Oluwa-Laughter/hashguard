@@ -159,8 +159,8 @@ export function AccessGuard({ children }: { children: React.ReactNode }) {
           {/* Primary Action: Full-Width Connect Wallet */}
           <WalletButton className="w-full py-3.5 text-sm font-bold shadow-lg shadow-emerald-500/20 justify-center rounded-xl" />
 
-          {/* Secondary Actions: Equal 2-Column Balance */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Secondary Actions: Responsive 1 or 2 Column Balance */}
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={handleAddHskChain}
@@ -168,7 +168,7 @@ export function AccessGuard({ children }: { children: React.ReactNode }) {
               title="Automatically register HSKChain in MetaMask, OKX, or Rabby"
             >
               <Icon name="spark" className="h-3.5 w-3.5 text-emerald-400 flex-shrink-0" />
-              <span>Add {hskChain.name}</span>
+              <span className="truncate">Add {hskChain.name}</span>
             </button>
             <Link
               href="/"

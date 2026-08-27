@@ -573,16 +573,16 @@ export function RecurringForm({ initial }: RecurringFormProps) {
               ))}
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2.5">
               <button
-                className="button button-secondary flex-1"
+                className="button button-secondary w-full sm:flex-1 py-2.5"
                 disabled={isPending || receipt.isLoading}
                 onClick={() => setReviewing(false)}
               >
                 Back
               </button>
               <button
-                className="button button-primary flex-1"
+                className="button button-primary w-full sm:flex-1 py-2.5"
                 disabled={isPending || receipt.isLoading}
                 onClick={sign}
               >

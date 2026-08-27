@@ -68,10 +68,10 @@ export function EscrowCard({ id, escrow }: { id: number; escrow: Escrow }) {
               {tokenSymbol}
             </span>
           </div>
-          <p className="mt-2 text-xl font-extrabold text-white font-mono">{formattedAmount}</p>
+          <p className="mt-2 text-xl font-extrabold text-white font-mono truncate">{formattedAmount}</p>
         </div>
         <span
-          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
             escrow.status === 0
               ? "bg-amber-400/15 text-amber-300 border border-amber-400/30"
               : escrow.status === 1
@@ -84,27 +84,32 @@ export function EscrowCard({ id, escrow }: { id: number; escrow: Escrow }) {
       </div>
 
       <div className="mt-4 grid gap-1.5 text-xs text-gray-400 border-t border-white/[0.04] pt-3">
-        <p className="flex justify-between">
-          <span>From</span>
+        <p className="flex justify-between items-center">
+          <span className="text-gray-500">From</span>
           <span className="font-mono text-white">{shortAddress(escrow.sender)}</span>
         </p>
-        <p className="flex justify-between">
-          <span>To</span>
+        <p className="flex justify-between items-center">
+          <span className="text-gray-500">To</span>
           <span className="font-mono text-white">{shortAddress(escrow.recipient)}</span>
         </p>
-        <p className="flex justify-between">
-          <span>Expiry</span>
-          <span className="font-mono text-white">{new Date(Number(escrow.expiry) * 1000).toLocaleString()}</span>
+        <p className="flex justify-between items-center gap-2">
+          <span className="text-gray-500 shrink-0">Expiry</span>
+          <span className="font-mono text-white text-right truncate text-[11px] sm:text-xs">
+            {new Date(Number(escrow.expiry) * 1000).toLocaleString(undefined, {
+              dateStyle: "short",
+              timeStyle: "short",
+            })}
+          </span>
         </p>
       </div>
 
-      <div className="mt-5 flex gap-2.5">
-        <Link href={`/pay/${id}`} className="button button-secondary flex-1 text-xs text-center py-2">
+      <div className="mt-5 flex gap-2">
+        <Link href={`/pay/${id}`} className="button button-secondary flex-1 text-xs text-center py-2 px-2 truncate">
           Details
         </Link>
         {action && (
           <button
-            className="button button-primary flex-1 text-xs py-2"
+            className="button button-primary flex-1 text-xs py-2 px-2 truncate"
             disabled={isPending || receipt.isLoading}
             onClick={action}
           >

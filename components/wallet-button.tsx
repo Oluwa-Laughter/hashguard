@@ -8,8 +8,20 @@ import { shortAddress } from "@/lib/utils";
 import { Icon } from "@/components/icons";
 import { useUserUsername } from "@/lib/username-client";
 
-import { SiCoinbase } from "react-icons/si";
-import { FaWallet } from "react-icons/fa6";
+const CoinbaseIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="32" height="32" rx="16" fill="#0052FF"/>
+    <circle cx="16" cy="16" r="6" fill="white"/>
+  </svg>
+);
+
+const DefaultWalletIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
+    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+    <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+  </svg>
+);
 
 // Real-brand SVGs (for wallets not available in react-icons)
 const MetaMaskIcon = () => (
@@ -218,7 +230,7 @@ export function WalletButton({ className = "" }: { className?: string }) {
                       {isMetaMask ? (
                         <MetaMaskIcon />
                       ) : isCoinbase ? (
-                        <SiCoinbase className="h-7 w-7 text-[#0052FF]" />
+                        <CoinbaseIcon />
                       ) : isRainbow ? (
                         <RainbowIcon />
                       ) : isTrust ? (
@@ -230,7 +242,7 @@ export function WalletButton({ className = "" }: { className?: string }) {
                       ) : isRabby ? (
                         <RabbyIcon />
                       ) : (
-                        <FaWallet className="h-6 w-6 text-emerald-400" />
+                        <DefaultWalletIcon />
                       )}
                     </span>
                     <div>

@@ -424,21 +424,21 @@ function DashboardContent() {
               const statusColors = ["bg-amber-400/15 text-amber-300", "bg-emerald-400/15 text-emerald-300", "bg-gray-500/15 text-gray-400"];
 
               return (
-                <div key={id} className="flex items-center justify-between p-5 hover:bg-white/[0.01] transition-colors">
+                <div key={id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 hover:bg-white/[0.01] transition-colors border-b border-white/[0.03] last:border-0">
                   <div className="flex items-center gap-3">
-                    <span className={`rounded-xl p-2 bg-white/[0.03] ${isSender ? "text-rose-400" : "text-emerald-400"}`}>
+                    <span className={`rounded-xl p-2 bg-white/[0.03] shrink-0 ${isSender ? "text-rose-400" : "text-emerald-400"}`}>
                       <Icon name={isSender ? "arrow" : "shield"} className="h-4 w-4 rotate-[-45deg]" />
                     </span>
-                    <div>
-                      <p className="text-sm font-bold text-white">{actionLabel}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{actionLabel}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">
                         {isSender ? `To: ${shortAddress(escrow.recipient)}` : `From: ${shortAddress(escrow.sender)}`} · Expiry {dateStr}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-white">{amountStr}</p>
-                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusColors[escrow.status]}`}>
+                  <div className="text-left sm:text-right flex items-center justify-between sm:block pl-11 sm:pl-0">
+                    <p className="text-sm font-bold text-white font-mono">{amountStr}</p>
+                    <span className={`sm:mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusColors[escrow.status]}`}>
                       {statusLabels[escrow.status]}
                     </span>
                   </div>
