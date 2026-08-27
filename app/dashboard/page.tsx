@@ -150,7 +150,7 @@ function DashboardContent() {
   return (
     <main className="shell py-12 sm:py-16">
       {/* Top Welcome Panel */}
-      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between border-b border-white/[0.06] pb-8">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between border-b border-white/[0.06] pb-8">
         <div>
           <div className="flex items-center gap-2">
             <span className="status-dot" />
@@ -180,21 +180,23 @@ function DashboardContent() {
             Monitor and execute protected payments and scheduled payments in real-time.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-3 text-right">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-3 text-right w-full sm:w-auto">
             <p className="text-[10px] font-bold tracking-wider text-gray-500 uppercase">Wallet Balance</p>
             <p className="text-lg font-bold text-white mt-0.5">
               {balance.data ? `${Number(formatEther(balance.data.value)).toFixed(4)} HSK` : "— HSK"}
             </p>
           </div>
-          <Link href="/claim" className="button button-secondary flex items-center gap-1.5">
-            <Icon name="spark" className="h-4 w-4 text-emerald-400" />
-            Claim Payments
-          </Link>
-          <Link href="/pay" className="button button-primary">
-            <Icon name="shield" className="h-4 w-4" />
-            New Payment
-          </Link>
+          <div className="flex gap-3 w-full sm:w-auto">
+            <Link href="/claim" className="button button-secondary flex-1 sm:flex-none justify-center items-center gap-1.5">
+              <Icon name="spark" className="h-4 w-4 text-emerald-400" />
+              Claim Payments
+            </Link>
+            <Link href="/pay" className="button button-primary flex-1 sm:flex-none justify-center">
+              <Icon name="shield" className="h-4 w-4" />
+              New Payment
+            </Link>
+          </div>
         </div>
       </div>
 

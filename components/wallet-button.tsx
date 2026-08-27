@@ -8,7 +8,10 @@ import { shortAddress } from "@/lib/utils";
 import { Icon } from "@/components/icons";
 import { useUserUsername } from "@/lib/username-client";
 
-// Real-brand SVGs
+import { SiCoinbase } from "react-icons/si";
+import { FaWallet } from "react-icons/fa6";
+
+// Real-brand SVGs (for wallets not available in react-icons)
 const MetaMaskIcon = () => (
   <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M29.8 4.3l-8.7 7.2-2.1-5.1 10.8-2.1z" fill="#E2761B"/>
@@ -28,13 +31,6 @@ const MetaMaskIcon = () => (
     <path d="M16 23.5c-2.3 0-4.3-1.1-5.5-2.8l1.6-5.3 3.9 2.5 3.9-2.5 1.6 5.3c-1.2 1.7-3.2 2.8-5.5 2.8z" fill="#FF8F00"/>
     <path d="M21.1 16.2l4.2-3.2.7 6.6-4.9-3.4z" fill="#FF8F00"/>
     <path d="M10.9 16.2l-4.2-3.2-.7 6.6 4.9-3.4z" fill="#FF8F00"/>
-  </svg>
-);
-
-const CoinbaseIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="32" height="32" rx="16" fill="#0052FF"/>
-    <path fillRule="evenodd" clipRule="evenodd" d="M16 23.5c4.142 0 7.5-3.358 7.5-7.5s-3.358-7.5-7.5-7.5-7.5 3.358-7.5 7.5 3.358 7.5 7.5 7.5zm0-3c2.485 0 4.5-2.015 4.5-4.5s-2.015-4.5-4.5-4.5-4.5 2.015-4.5 4.5 2.015 4.5 4.5 4.5z" fill="white"/>
   </svg>
 );
 
@@ -73,14 +69,6 @@ const RabbyIcon = () => (
   <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect width="32" height="32" rx="16" fill="#7088FA"/>
     <path d="M10 10h12v12H10V10z" fill="white"/>
-  </svg>
-);
-
-const GenericWalletIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M12 2v9" />
-    <path d="M8 5h8" />
   </svg>
 );
 
@@ -230,7 +218,7 @@ export function WalletButton({ className = "" }: { className?: string }) {
                       {isMetaMask ? (
                         <MetaMaskIcon />
                       ) : isCoinbase ? (
-                        <CoinbaseIcon />
+                        <SiCoinbase className="h-7 w-7 text-[#0052FF]" />
                       ) : isRainbow ? (
                         <RainbowIcon />
                       ) : isTrust ? (
@@ -242,7 +230,7 @@ export function WalletButton({ className = "" }: { className?: string }) {
                       ) : isRabby ? (
                         <RabbyIcon />
                       ) : (
-                        <GenericWalletIcon />
+                        <FaWallet className="h-6 w-6 text-emerald-400" />
                       )}
                     </span>
                     <div>

@@ -1,0 +1,33 @@
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: use-sync-external-store@1.2.0
+npm warn Found: react@19.2.8
+npm warn node_modules/react
+npm warn   peer react@"^18 || ^19" from @tanstack/react-query@5.102.5
+npm warn   node_modules/@tanstack/react-query
+npm warn     peerOptional @tanstack/react-query@">=5.59.0" from porto@0.2.35
+npm warn     node_modules/porto
+npm warn     2 more (wagmi, the root project)
+npm warn   10 more (zustand, next, porto, react-dom, styled-jsx, ...)
+npm warn
+npm warn Could not resolve dependency:
+npm warn peer react@"^16.8.0 || ^17.0.0 || ^18.0.0" from use-sync-external-store@1.2.0
+npm warn node_modules/valtio/node_modules/use-sync-external-store
+npm warn   use-sync-external-store@"1.2.0" from valtio@1.13.2
+npm warn   node_modules/valtio
+npm warn
+npm warn Conflicting peer dependency: react@18.3.1
+npm warn node_modules/react
+npm warn   peer react@"^16.8.0 || ^17.0.0 || ^18.0.0" from use-sync-external-store@1.2.0
+npm warn   node_modules/valtio/node_modules/use-sync-external-store
+npm warn     use-sync-external-store@"1.2.0" from valtio@1.13.2
+npm warn     node_modules/valtio
+npm error code ENOTFOUND
+npm error syscall getaddrinfo
+npm error errno ENOTFOUND
+npm error network request to https://registry.npmjs.org/react-icons failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org
+npm error network This is a problem related to network connectivity.
+npm error network In most cases you are behind a proxy or have bad network settings.
+npm error network
+npm error network If you are behind a proxy, please make sure that the
+npm error network 'proxy' config is set properly.  See: 'npm help config'
+npm error A complete log of this run can be found in: /Users/user/.npm/_logs/2026-08-27T08_52_52_588Z-debug-0.log

@@ -78,15 +78,15 @@ export function LandingPage() {
             </ScrollReveal>
             
             <ScrollReveal delay={400}>
-              <div className="mt-12 grid grid-cols-3 gap-4 border-t border-white/[0.08] pt-8 text-left">
+              <div className="mt-12 grid grid-cols-2 gap-4 border-t border-white/[0.08] pt-8 text-left">
                 <div>
                   <p className="font-mono text-xl sm:text-2xl font-extrabold text-white">0%</p>
                   <p className="text-xs text-gray-400 mt-0.5 font-medium">Custodial Risk (Direct Escrows)</p>
                 </div>
-                <div>
-                  <p className="font-mono text-xl sm:text-2xl font-extrabold text-emerald-400">1-to-1</p>
+                {/* <div>
+                  <p className="font-mono text-xl sm:text-2xl font-extrabold text-emerald-400">1-to-any</p>
                   <p className="text-xs text-gray-400 mt-0.5 font-medium">Immutable Verified Handles</p>
-                </div>
+                </div> */}
                 <div>
                   <p className="font-mono text-xl sm:text-2xl font-extrabold text-cyan-400">100%</p>
                   <p className="text-xs text-gray-400 mt-0.5 font-medium">Atomic Batch Settlement</p>
