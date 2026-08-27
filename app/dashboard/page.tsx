@@ -246,7 +246,7 @@ function DashboardContent() {
             userSchedules.map(({ id, schedule }) => {
               const statusText = schedule.status === 0 ? "Active" : schedule.status === 1 ? "Cancelled" : "Completed";
               const statusColor = schedule.status === 0 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : schedule.status === 1 ? "text-rose-400 bg-rose-500/10 border-rose-500/20" : "text-gray-400 bg-gray-500/10 border-gray-500/20";
-              const isDue = schedule.status === 0 && now >= Number(schedule.nextPaymentTime) && Number(schedule.periodsPaid) < Number(schedule.totalPeriods);
+              const isDue = schedule.status === 0 && now >= (Number(schedule.nextPaymentTime) + 15) && Number(schedule.periodsPaid) < Number(schedule.totalPeriods);
               const tokenSymbol = schedule.token === zeroAddress ? "HSK" : "USDC";
 
               return (

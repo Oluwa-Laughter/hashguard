@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { parseEther, parseUnits, zeroAddress, type Address } from "viem";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import {
@@ -273,6 +274,65 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
         );
       }
     }
+  }
+
+  // Success Receipt Screen to prevent double submission
+  if (transactionKind === "escrow" && receipt.isSuccess) {
+    return (
+      <div className="card text-center py-10 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto">
+        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+          <Icon name="check" className="h-8 w-8" />
+        </span>
+        <h2 className="text-xl font-extrabold text-white mt-5">Payment Escrow Confirmed!</h2>
+        <p className="text-sm text-gray-300 mt-2 max-w-md mx-auto leading-relaxed">
+          Your transaction has been finalized on HSKChain. The funds of <strong className="text-emerald-400">{amount} {tokenSymbol}</strong> are now safely locked under protection.
+        </p>
+
+        <div className="mt-6 p-4 rounded-xl border border-white/[0.04] bg-white/[0.02] text-xs max-w-sm mx-auto text-left space-y-2 text-gray-400">
+          <div className="flex justify-between">
+            <span>Recipient:</span>
+            <span className="text-white font-bold">{recipient}</span>
+          </div>
+          {resolved && resolved !== recipient && (
+            <div className="flex justify-between">
+              <span>Resolved Address:</span>
+              <span className="font-mono text-white text-[11px]">{shortAddress(resolved)}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span>Protection Lock:</span>
+            <span className="text-white font-semibold">{formattedExpiry}</span>
+          </div>
+          {hash && (
+            <div className="flex justify-between border-t border-white/[0.04] pt-2 mt-2">
+              <span>Tx Hash:</span>
+              <a
+                href={`https://explorer.hsk.xyz/tx/${hash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-emerald-400 hover:underline"
+              >
+                {shortAddress(hash)}
+              </a>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8 flex justify-center gap-3">
+          <button
+            onClick={() => {
+              window.location.reload();
+            }}
+            className="button button-primary text-xs py-2.5 px-4"
+          >
+            Create New Payment
+          </button>
+          <Link href="/payments" className="button button-secondary text-xs py-2.5 px-4">
+            View Escrow Inbox
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

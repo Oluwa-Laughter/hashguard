@@ -53,8 +53,8 @@ function BatchPaymentItem({ recipient, amount }: { recipient: string; amount: st
           {recipient.startsWith("0x") && resolvedUsername ? `${resolvedUsername} (${shortAddress(recipient)})` : recipient}
         </p>
         {!recipient.startsWith("0x") && (
-          <p className="text-xs text-gray-500 mt-0.5 font-semibold">
-            {resolving ? "Resolving address…" : resolvedAddress ? `Resolved: ${shortAddress(resolvedAddress)}` : "Not resolved in database"}
+          <p className="text-xs mt-0.5 font-semibold text-gray-500">
+            {resolving ? "Resolving address…" : resolvedAddress ? `Resolved: ${shortAddress(resolvedAddress)}` : "User not found on the app"}
           </p>
         )}
       </div>
@@ -78,6 +78,8 @@ function AgentContent() {
   const [apiResolvedAddress, setApiResolvedAddress] = useState<string>();
   const [apiResolvedUsername, setApiResolvedUsername] = useState<string>();
   const [resolving, setResolving] = useState(false);
+
+  const isUnresolvedRecipient = recipient.startsWith("@") && !apiResolvedAddress && !resolving;
 
   useEffect(() => {
     if (!recipient) {
@@ -229,12 +231,12 @@ function AgentContent() {
                   {recipient.startsWith("0x") ? (
                     <div className="flex justify-between">
                       <dt>Resolved Username</dt>
-                      <dd>{resolving ? "Resolving…" : apiResolvedUsername || "No registered username found"}</dd>
+                      <dd>{resolving ? "Resolving…" : apiResolvedUsername || "User not found on the app"}</dd>
                     </div>
                   ) : (
                     <div className="flex justify-between">
                       <dt>Resolved Address</dt>
-                      <dd>{resolving ? "Resolving…" : apiResolvedAddress ? shortAddress(apiResolvedAddress) : "Not resolved in database"}</dd>
+                      <dd>{resolving ? "Resolving…" : apiResolvedAddress ? shortAddress(apiResolvedAddress) : "User not found on the app"}</dd>
                     </div>
                   )}
                   <div className="flex justify-between">
@@ -246,8 +248,21 @@ function AgentContent() {
                     <dd>{intent.expiryDays} days</dd>
                   </div>
                 </dl>
-                <p className="mt-4 text-sm text-emerald-50/65">Refund available after expiry if unclaimed. You will review again before the wallet request.</p>
-                <Link className="button button-primary mt-5" href={payHref}>Continue to confirm & sign</Link>
+                {isUnresolvedRecipient ? (
+                  <p className="mt-4 text-xs text-rose-300 font-semibold flex items-center gap-1.5">
+                    <Icon name="lock" className="h-3.5 w-3.5 text-rose-400" />
+                    Recipient username is not registered. Cannot initiate transfer.
+                  </p>
+                ) : (
+                  <p className="mt-4 text-sm text-emerald-50/65">Refund available after expiry if unclaimed. You will review again before the wallet request.</p>
+                )}
+                {isUnresolvedRecipient ? (
+                  <button className="button button-primary mt-5 opacity-40 cursor-not-allowed" disabled>
+                    Recipient Not Found
+                  </button>
+                ) : (
+                  <Link className="button button-primary mt-5" href={payHref}>Continue to confirm & sign</Link>
+                )}
               </div>
             )}
             {intent.action === "batch_payment" && (
@@ -276,12 +291,12 @@ function AgentContent() {
                   {recipient.startsWith("0x") ? (
                     <div className="flex justify-between">
                       <dt>Resolved Username</dt>
-                      <dd>{resolving ? "Resolving…" : apiResolvedUsername || "No registered username found"}</dd>
+                      <dd>{resolving ? "Resolving…" : apiResolvedUsername || "User not found on the app"}</dd>
                     </div>
                   ) : (
                     <div className="flex justify-between">
                       <dt>Resolved Address</dt>
-                      <dd>{resolving ? "Resolving…" : apiResolvedAddress ? shortAddress(apiResolvedAddress) : "Not resolved in database"}</dd>
+                      <dd>{resolving ? "Resolving…" : apiResolvedAddress ? shortAddress(apiResolvedAddress) : "User not found on the app"}</dd>
                     </div>
                   )}
                   <div className="flex justify-between">
@@ -301,8 +316,21 @@ function AgentContent() {
                     <dd>{intent.totalAmount} {intent.tokenSymbol}</dd>
                   </div>
                 </dl>
-                <p className="mt-4 text-xs text-gray-500">The total amount will be funded and deposited upfront into the schedule contract.</p>
-                <Link className="button button-primary mt-5" href={recurringHref}>Continue to schedule review</Link>
+                {isUnresolvedRecipient ? (
+                  <p className="mt-4 text-xs text-rose-300 font-semibold flex items-center gap-1.5">
+                    <Icon name="lock" className="h-3.5 w-3.5 text-rose-400" />
+                    Recipient username is not registered. Cannot initiate transfer.
+                  </p>
+                ) : (
+                  <p className="mt-4 text-xs text-gray-500">The total amount will be funded and deposited upfront into the schedule contract.</p>
+                )}
+                {isUnresolvedRecipient ? (
+                  <button className="button button-primary mt-5 opacity-40 cursor-not-allowed" disabled>
+                    Recipient Not Found
+                  </button>
+                ) : (
+                  <Link className="button button-primary mt-5" href={recurringHref}>Continue to schedule review</Link>
+                )}
               </div>
             )}
           </section>

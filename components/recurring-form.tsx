@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { parseEther, parseUnits, zeroAddress, type Address } from "viem";
+import Link from "next/link";
+import { parseEther, parseUnits, formatEther, zeroAddress, type Address } from "viem";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import {
   scheduledPaymentAddress,
@@ -41,7 +42,7 @@ export function RecurringForm({ initial }: RecurringFormProps) {
   const [amount, setAmount] = useState(initial?.amount || "");
   const [periods, setPeriods] = useState(initial?.periods || "6");
   const [intervalType, setIntervalType] = useState<string>(initial?.interval || "monthly");
-  const [demoMode, setDemoMode] = useState(true); // Default to true for hackathon speed testing
+  const [demoMode, setDemoMode] = useState(false); // Default to false for real-time calendar dates
 
   // Token Selection
   const [selectedTokenKey, setSelectedTokenKey] = useState<string>(() => {
@@ -277,6 +278,66 @@ export function RecurringForm({ initial }: RecurringFormProps) {
     }
   }
 
+  // Success Receipt Screen to prevent double submission
+  if (transactionKind === "create" && receipt.isSuccess) {
+    const totalAmount = (Number(amount) * numPeriods).toFixed(2).replace(/\.00$/, "");
+    return (
+      <div className="card text-center py-10 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto">
+        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+          <Icon name="check" className="h-8 w-8" />
+        </span>
+        <h2 className="text-xl font-extrabold text-white mt-5">Recurring Schedule Funded!</h2>
+        <p className="text-sm text-gray-300 mt-2 max-w-md mx-auto leading-relaxed">
+          Your recurring schedule has been successfully deployed and funded on HSKChain. Senders can view period releases inside the Subscription Monitor.
+        </p>
+
+        <div className="mt-6 p-4 rounded-xl border border-white/[0.04] bg-white/[0.02] text-xs max-w-sm mx-auto text-left space-y-2 text-gray-400">
+          <div className="flex justify-between">
+            <span>Recipient:</span>
+            <span className="text-white font-bold">{recipient}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Installment Plan:</span>
+            <span className="text-white font-semibold">
+              {periods} payments of {amount} {tokenSymbol} ({intervalType})
+            </span>
+          </div>
+          <div className="flex justify-between border-t border-white/[0.04] pt-2 mt-2">
+            <span className="font-bold text-gray-300">Total Commitment Locked:</span>
+            <span className="font-mono text-emerald-400 font-bold">{totalAmount} {tokenSymbol}</span>
+          </div>
+          {hash && (
+            <div className="flex justify-between border-t border-white/[0.04] pt-2 mt-2">
+              <span>Tx Hash:</span>
+              <a
+                href={`https://explorer.hsk.xyz/tx/${hash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-emerald-400 hover:underline"
+              >
+                {shortAddress(hash)}
+              </a>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8 flex justify-center gap-3">
+          <button
+            onClick={() => {
+              window.location.reload();
+            }}
+            className="button button-primary text-xs py-2.5 px-4"
+          >
+            Create New Plan
+          </button>
+          <Link href="/dashboard" className="button button-secondary text-xs py-2.5 px-4">
+            Go to Subscription Monitor
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card max-w-2xl mx-auto">
       <div className="mb-6 flex items-start gap-4">
@@ -433,29 +494,6 @@ export function RecurringForm({ initial }: RecurringFormProps) {
           </div>
         </div>
 
-        {/* Hackathon Speed Test Mode Toggle */}
-        <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-xs">
-          <div className="flex items-center gap-2">
-            <Icon name="spark" className="h-4 w-4 text-emerald-400" />
-            <div>
-              <p className="font-bold text-white">Hackathon Testing Acceleration</p>
-              <p className="text-[11px] text-gray-400">
-                {demoMode ? "1 Period = 1 to 3 minutes (Speed Test)" : "1 Period = Normal calendar days/months"}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            className={`rounded-lg px-2.5 py-1 font-semibold text-[11px] transition-colors ${
-              demoMode
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                : "bg-white/[0.05] text-gray-400 border border-white/[0.08]"
-            }`}
-            onClick={() => setDemoMode(!demoMode)}
-          >
-            {demoMode ? "Accelerated ⚡" : "Real Time ⏱️"}
-          </button>
-        </div>
 
         {/* Summary Card */}
         {amount && Number(amount) > 0 && (
@@ -469,7 +507,10 @@ export function RecurringForm({ initial }: RecurringFormProps) {
             <div className="flex justify-between border-t border-white/[0.04] pt-2 text-sm">
               <span className="font-bold text-gray-300">Total Commitment:</span>
               <span className="font-extrabold text-emerald-400 font-mono">
-                {(Number(amount) * numPeriods).toFixed(2).replace(/\.00$/, "")} {tokenSymbol}
+                {isNative
+                  ? `${(Number(amount) * numPeriods).toFixed(4).replace(/\.?0+$/, "")}`
+                  : `${(Number(amount) * numPeriods).toFixed(2).replace(/\.?0+$/, "")}`}{" "}
+                {tokenSymbol}
               </span>
             </div>
           </div>
@@ -513,7 +554,10 @@ export function RecurringForm({ initial }: RecurringFormProps) {
               <div className="flex justify-between border-t border-white/[0.06] pt-2 font-bold text-sm">
                 <dt className="text-gray-300">Total Lockup:</dt>
                 <dd className="font-mono text-emerald-400">
-                  {(Number(amount) * numPeriods).toFixed(2).replace(/\.00$/, "")} {tokenSymbol}
+                  {isNative
+                    ? `${(Number(amount) * numPeriods).toFixed(4).replace(/\.?0+$/, "")}`
+                    : `${(Number(amount) * numPeriods).toFixed(2).replace(/\.?0+$/, "")}`}{" "}
+                  {tokenSymbol}
                 </dd>
               </div>
             </dl>

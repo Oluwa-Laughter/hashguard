@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { fallbackIntent } from "@/lib/agent";
 
 const SYSTEM_PROMPT = `You are HashGuard Agent, the autonomous intent-to-execution assistant for HashGuard on HSKChain.
@@ -14,7 +15,7 @@ Always return ONLY valid JSON adhering strictly to one of the following schemas:
   "amount": "decimal string (e.g. '10' or '0.5')",
   "token": "native" | "token",
   "tokenSymbol": "HSK" | "USDC" | "USDT" | "WETH",
-  "expiryDays": positive integer (default 7 if not specified)
+  "expiryDays": positive integer (normalized to days: e.g., '2 weeks' -> 14, '1 month' -> 30, '48 hours' -> 2. Default is 7 if no duration is specified)
 }
 
 2. Batch Payment:
@@ -25,15 +26,15 @@ Always return ONLY valid JSON adhering strictly to one of the following schemas:
   "tokenSymbol": "HSK" | "USDC" | "USDT" | "WETH"
 }
 
-3. Recurring Payment Plan (e.g. monthly for 6 months):
+3. Recurring Payment Plan:
 {
   "action": "recurring_payment",
   "recipient": "@username or 0x address",
-  "amountPerPeriod": "decimal string (e.g. '100')",
+  "amountPerPeriod": "decimal string",
   "token": "native" | "token",
   "tokenSymbol": "HSK" | "USDC" | "USDT" | "WETH",
   "interval": "monthly" | "weekly" | "daily",
-  "frequencyCount": positive integer (e.g. 6),
+  "frequencyCount": positive integer,
   "totalAmount": "decimal string (amountPerPeriod * frequencyCount)",
   "schedule": [{"period": 1, "date": "Date string", "amount": "decimal string"}],
   "summary": "concise description of the recurring payment plan"
@@ -61,11 +62,12 @@ Always return ONLY valid JSON adhering strictly to one of the following schemas:
   "message": "concise guidance"
 }
 
-Rules:
-- For HSK payments: token is "native", tokenSymbol is "HSK".
-- For USDT, USDC, WETH, or other ERC-20s: token is "token", tokenSymbol is the uppercase symbol.
-- Default protection period is 7 days.
-- Never output markdown tags or explanations outside the JSON. Return raw JSON only.`;
+Instructions for generic and flexible parsing:
+- Be highly robust to various word orders, slang, typos (e.g. 'sen', 'send HSK to @alice', 'transfer @alice 10 HSK', 'escrow 5 HSK for bob', 'lock 1 HSK').
+- Always extract recipient usernames (ensure they are returned with leading '@' prefix if not a hex address) or hex addresses.
+- If the user specifies any protection duration/lock time (e.g., 'for 2 weeks', 'locked 3 months', 'expire in 48 hours'), convert it into the corresponding integer count of days for 'expiryDays' (e.g. '2 weeks' -> 14, '1 month' -> 30, '48 hours' -> 2).
+- Default to 7 days if no duration is specified.
+- Never output markdown tags or prose explanation. Return raw JSON only.`;
 
 export async function POST(request: NextRequest) {
   try {

@@ -61,6 +61,7 @@ export function fallbackIntent(message: string): AgentIntent {
   const text = message.trim();
   const lower = text.toLowerCase();
 
+  // 1. Classification matches
   if (/balance|how much.*(hsk|usdc|usdt|weth|token|crypto)/.test(lower)) {
     const tokenMatch = lower.match(/\b(hsk|usdc|usdt|weth)\b/);
     return {
@@ -77,33 +78,7 @@ export function fallbackIntent(message: string): AgentIntent {
     return { action: "explain_payment" };
   }
 
-  // Detect token symbol across global stablecoins and ERC-20s
-  let detectedSymbol = "HSK";
-  let isErc20 = false;
-  if (/\busdt\b/i.test(text)) {
-    detectedSymbol = "USDT";
-    isErc20 = true;
-  } else if (/\busdc\b/i.test(text)) {
-    detectedSymbol = "USDC";
-    isErc20 = true;
-  } else if (/\bdai\b|\busds\b/i.test(text)) {
-    detectedSymbol = "DAI";
-    isErc20 = true;
-  } else if (/\beurc\b|\beuro\b/i.test(text)) {
-    detectedSymbol = "EURC";
-    isErc20 = true;
-  } else if (/\bpyusd\b/i.test(text)) {
-    detectedSymbol = "PYUSD";
-    isErc20 = true;
-  } else if (/\bfdusd\b/i.test(text)) {
-    detectedSymbol = "FDUSD";
-    isErc20 = true;
-  } else if (/\bweth\b|\beth\b/i.test(text)) {
-    detectedSymbol = "WETH";
-    isErc20 = true;
-  }
-
-  // Detect Recurring Payment Intent (e.g. "pay @alice 100 USDT monthly for the next six months")
+  // 2. Recurring plans
   const isRecurring =
     /recurring|recurrence|monthly|weekly|daily|every month|every week|every day/i.test(text);
 
@@ -124,7 +99,6 @@ export function fallbackIntent(message: string): AgentIntent {
       count = numberWords[raw] || parseInt(raw, 10) || 6;
     }
 
-    // Try alternate format: send @recipient [amount] first, fallback to standard
     const recipientMatch =
       text.match(/(?:to\s+)?(@[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})/i) ||
       text.match(/(?:send|pay|sen)\s+([a-zA-Z0-9_@]+)/i);
@@ -172,23 +146,23 @@ export function fallbackIntent(message: string): AgentIntent {
       action: "recurring_payment",
       recipient,
       amountPerPeriod,
-      token: isErc20 ? "token" : "native",
-      tokenSymbol: detectedSymbol,
+      token: /usdt/i.test(text) ? "token" : /usdc/i.test(text) ? "token" : "native",
+      tokenSymbol: /usdt/i.test(text) ? "USDT" : /usdc/i.test(text) ? "USDC" : "HSK",
       interval,
       frequencyCount: count,
       totalAmount: totalCalc,
       schedule,
-      summary: `Pay ${amountPerPeriod} ${detectedSymbol} ${interval} to ${recipient} for ${count} ${intervalLabel} (Total commitment: ${totalCalc} ${detectedSymbol}).`,
+      summary: `Pay ${amountPerPeriod} ${/usdt/i.test(text) ? "USDT" : /usdc/i.test(text) ? "USDC" : "HSK"} ${interval} to ${recipient} for ${count} ${intervalLabel} (Total commitment: ${totalCalc} HSK).`,
     };
   }
 
-  // Detect batch payment pattern (e.g. "@alice 1, @bob 2" or "1 to @alice, 2 to @bob")
-  const batch = [...text.matchAll(/(@?[a-zA-Z0-9_]+)\s+(\d+(?:\.\d+)?)/g)];
+  // 3. Batch payments - Recipient MUST start with @ or 0x to avoid matching normal prose words
+  const batch = [...text.matchAll(/(@[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})\s+(\d+(?:\.\d+)?)/g)];
   if (batch.length > 1) {
     return {
       action: "batch_payment",
-      token: isErc20 ? "token" : "native",
-      tokenSymbol: detectedSymbol,
+      token: /usdt/i.test(text) ? "token" : /usdc/i.test(text) ? "token" : "native",
+      tokenSymbol: /usdt/i.test(text) ? "USDT" : /usdc/i.test(text) ? "USDC" : "HSK",
       payments: batch.map((m) => {
         let recipient = m[1];
         if (!recipient.startsWith("@") && !recipient.startsWith("0x")) {
@@ -199,49 +173,74 @@ export function fallbackIntent(message: string): AgentIntent {
     };
   }
 
-  // Detect protected single payment pattern
-  // Matches standard: "send 10 HSK to @alice for 5 days"
-  // Matches alternate: "sen @alic 4HSK"
-  const alternateMatch = text.match(
-    /(?:send|pay|sen)\s+(@?[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})\s+(\d+(?:\.\d+)?)\s*(hsk|usdt|usdc|dai|eurc|pyusd|fdusd|weth)?/i
-  );
+  // 4. Token-Based Generic Protected Transfer Parser
+  // Extractor 1: Recipient address or handler username
+  const recipientMatch = text.match(/(@[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})/);
+  let recipient = recipientMatch ? recipientMatch[1] : undefined;
 
-  if (alternateMatch) {
-    let recipient = alternateMatch[1];
-    if (!recipient.startsWith("@") && !recipient.startsWith("0x")) {
-      recipient = "@" + recipient;
+  if (!recipient) {
+    // Look for usernames missing a leading '@' following active verb tokens
+    const verbMatch = text.match(/(?:send|pay|sen|to)\s+([a-zA-Z0-9_]+)/i);
+    if (verbMatch) {
+      const candidate = verbMatch[1].toLowerCase();
+      const reserved = ["hsk", "usdt", "usdc", "weth", "dai", "for", "lock", "escrow", "day", "week", "month", "hour"];
+      if (!reserved.includes(candidate) && isNaN(Number(candidate))) {
+        recipient = "@" + verbMatch[1];
+      }
     }
-    const symbolFromMatch = alternateMatch[3]?.toUpperCase() || detectedSymbol;
-    const isErc = symbolFromMatch !== "HSK";
-
-    return {
-      action: "protected_transfer",
-      amount: alternateMatch[2],
-      token: isErc ? "token" : "native",
-      tokenSymbol: symbolFromMatch,
-      recipient,
-      expiryDays: 7,
-    };
   }
 
-  const standardMatch = text.match(
-    /(?:send|pay|sen)\s+(\d+(?:\.\d+)?)\s*(hsk|usdt|usdc|dai|eurc|pyusd|fdusd|weth)?\s+(?:to\s+)?(@?[a-zA-Z0-9_]+|0x[a-fA-F0-9]{40})(?:.*?(?:for\s+)?(\d+)\s*days?)?/i
+  // Extractor 2: Duration Expiry Locking Period
+  let expiryDays = 7;
+  const durationMatch = text.match(
+    /(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(day|week|month|year|hour)s?/i
   );
+  let durationValStr = "";
 
-  if (standardMatch) {
-    let recipient = standardMatch[3];
-    if (!recipient.startsWith("@") && !recipient.startsWith("0x")) {
-      recipient = "@" + recipient;
+  if (durationMatch) {
+    const rawVal = durationMatch[1].toLowerCase();
+    const unit = durationMatch[2].toLowerCase();
+    const num = numberWords[rawVal] || parseInt(rawVal, 10) || 1;
+    durationValStr = durationMatch[1];
+
+    if (unit === "day") {
+      expiryDays = num;
+    } else if (unit === "week") {
+      expiryDays = num * 7;
+    } else if (unit === "month") {
+      expiryDays = num * 30;
+    } else if (unit === "year") {
+      expiryDays = num * 365;
+    } else if (unit === "hour") {
+      expiryDays = Math.max(1, Math.round(num / 24));
     }
-    const symbolFromMatch = standardMatch[2]?.toUpperCase() || detectedSymbol;
-    const isErc = symbolFromMatch !== "HSK";
+  }
+
+  // Extractor 3: Payment lock amount
+  const numbers = [...text.matchAll(/(\d+(?:\.\d+)?)/g)].map((m) => m[1]);
+  const amountStr = numbers.find((n) => n !== durationValStr) || "0.001";
+
+  // Extractor 4: Active Token Symbol
+  let tokenSymbol = "HSK";
+  if (/\busdt\b/i.test(text)) {
+    tokenSymbol = "USDT";
+  } else if (/\busdc\b/i.test(text)) {
+    tokenSymbol = "USDC";
+  } else if (/\bweth\b|\beth\b/i.test(text)) {
+    tokenSymbol = "WETH";
+  } else if (/\bdai\b/i.test(text)) {
+    tokenSymbol = "DAI";
+  }
+  const isErc = tokenSymbol !== "HSK";
+
+  if (recipient) {
     return {
       action: "protected_transfer",
-      amount: standardMatch[1],
+      amount: amountStr,
       token: isErc ? "token" : "native",
-      tokenSymbol: symbolFromMatch,
+      tokenSymbol,
       recipient,
-      expiryDays: Number(standardMatch[4] || 7),
+      expiryDays,
     };
   }
 
