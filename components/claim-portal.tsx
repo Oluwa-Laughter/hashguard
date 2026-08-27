@@ -10,7 +10,9 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import { erc20Abi, hashGuardAbi, hashGuardAddress } from "@/lib/contracts";
+import { hskChain } from "@/lib/chains";
 import { shortAddress } from "@/lib/utils";
 import { formatTokenBalance, isNativeToken } from "@/lib/tokens";
 import { Icon } from "@/components/icons";
@@ -95,7 +97,7 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
     address: hashGuardAddress,
     abi: hashGuardAbi,
     functionName: "nextEscrowId",
-    query: { enabled: Boolean(hashGuardAddress) },
+    query: { enabled: Boolean(hashGuardAddress), refetchInterval: 3000 },
   });
 
   const totalCount = Math.min(Number(totalEscrowsQuery.data || 0n), 100);
@@ -114,7 +116,7 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
 
   const escrowsQuery = useReadContracts({
     contracts: escrowContracts,
-    query: { enabled: Boolean(hashGuardAddress && totalCount > 0) },
+    query: { enabled: Boolean(hashGuardAddress && totalCount > 0), refetchInterval: 3000 },
   });
 
   // Parse all incoming escrows for connected wallet
@@ -169,7 +171,7 @@ export function ClaimPortal({ initialEscrowId }: { initialEscrowId?: number }) {
     abi: hashGuardAbi,
     functionName: "getEscrow",
     args: [BigInt(selectedId !== undefined && selectedId >= 0 ? selectedId : 0)],
-    query: { enabled: Boolean(hashGuardAddress && selectedId !== undefined && selectedId >= 0) },
+    query: { enabled: Boolean(hashGuardAddress && selectedId !== undefined && selectedId >= 0), refetchInterval: 3000 },
   });
 
   const selectedEscrow = useMemo<EscrowItem | undefined>(() => {
@@ -437,25 +439,43 @@ function DirectClaimCard({
     });
   }, [escrow.sender, escrow.recipient]);
 
+  const queryClient = useQueryClient();
+  const [claimedLocally, setClaimedLocally] = useState<boolean>(escrow.status === 1);
+
+  useEffect(() => {
+    setClaimedLocally(escrow.status === 1);
+  }, [escrow.status]);
+
   // Transaction execution
-  const { writeContract, data: hash, isPending, error: claimError } = useWriteContract();
-  const receipt = useWaitForTransactionReceipt({ hash });
+  const { writeContract, data: hash, isPending, error: claimError, reset: resetWrite } = useWriteContract();
+  const receipt = useWaitForTransactionReceipt({ hash, chainId: hskChain.id });
 
   // Trigger cache refetch upon successful claim
   useEffect(() => {
-    if (receipt.isSuccess && onClaimSuccess) {
-      onClaimSuccess();
-    }
-  }, [receipt.isSuccess, onClaimSuccess]);
+    if (receipt.isSuccess) {
+      setClaimedLocally(true);
+      queryClient.invalidateQueries();
+      if (onClaimSuccess) onClaimSuccess();
 
+      const timer = setTimeout(() => {
+        queryClient.invalidateQueries();
+        if (onClaimSuccess) onClaimSuccess();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [receipt.isSuccess, onClaimSuccess, queryClient]);
+
+  const effectiveStatus = claimedLocally ? 1 : escrow.status;
   const isRecipient =
     currentUserAddress && currentUserAddress.toLowerCase() === escrow.recipient.toLowerCase();
   const isExpired = Number(escrow.expiry) <= currentTime;
-  const isPendingStatus = escrow.status === 0;
+  const isPendingStatus = effectiveStatus === 0;
 
   function handleClaim() {
     if (!hashGuardAddress) return;
+    resetWrite();
     writeContract({
+      chainId: hskChain.id,
       address: hashGuardAddress,
       abi: hashGuardAbi,
       functionName: "claim",
@@ -593,13 +613,15 @@ function DirectClaimCard({
               <button
                 type="button"
                 className="button button-primary w-full py-4 text-base font-bold shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.01]"
-                disabled={isPending || receipt.isLoading}
+                disabled={isPending || receipt.isLoading || receipt.isSuccess || claimedLocally}
                 onClick={handleClaim}
               >
                 {isPending
                   ? "Awaiting Wallet Signature…"
                   : receipt.isLoading
                   ? "Claiming on HSKChain…"
+                  : receipt.isSuccess || claimedLocally
+                  ? "Claimed ✓"
                   : `Claim ${formattedAmount} to Your Wallet`}
               </button>
 
@@ -616,7 +638,11 @@ function DirectClaimCard({
 
               {claimError && (
                 <p className="mt-3 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-300">
-                  {claimError.message || "Failed to claim escrow."}
+                  {claimError.message.includes("EscrowNotPending")
+                    ? "This escrow has already been claimed on-chain."
+                    : claimError.message.includes("User rejected")
+                    ? "Transaction was canceled in your wallet."
+                    : claimError.message.slice(0, 140)}
                 </p>
               )}
             </div>
@@ -625,14 +651,14 @@ function DirectClaimCard({
       )}
 
       {/* Already Claimed State */}
-      {escrow.status === 1 && (
+      {effectiveStatus === 1 && (
         <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-emerald-300 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
               <Icon name="check" className="h-4 w-4" />
             </span>
             <div>
-              <p className="font-bold text-sm text-white">Payment Already Claimed</p>
+              <p className="font-bold text-sm text-white">Payment Successfully Claimed</p>
               <p className="text-[11px] text-emerald-200/80">
                 Funds have been successfully released to {shortAddress(escrow.recipient)}.
               </p>

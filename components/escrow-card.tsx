@@ -1,9 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatEther, zeroAddress, type Address } from "viem";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import { erc20Abi, hashGuardAbi, hashGuardAddress } from "@/lib/contracts";
+import { hskChain } from "@/lib/chains";
 import { shortAddress } from "@/lib/utils";
 import { TransactionState } from "@/components/transaction-state";
 import { formatTokenBalance, isNativeToken } from "@/lib/tokens";
@@ -19,10 +22,28 @@ export type Escrow = {
 
 const labels = ["Pending", "Claimed", "Refunded"];
 
-export function EscrowCard({ id, escrow }: { id: number; escrow: Escrow }) {
+export function EscrowCard({
+  id,
+  escrow,
+  onActionSuccess,
+}: {
+  id: number;
+  escrow: Escrow;
+  onActionSuccess?: () => void;
+}) {
   const { address } = useAccount();
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const receipt = useWaitForTransactionReceipt({ hash });
+  const queryClient = useQueryClient();
+
+  // Local status state that immediately locks in upon successful transaction
+  const [localStatus, setLocalStatus] = useState<number>(escrow.status);
+
+  useEffect(() => {
+    // Keep in sync with incoming props if on-chain read updates
+    setLocalStatus(escrow.status);
+  }, [escrow.status]);
+
+  const { writeContract, data: hash, isPending, error: writeError, reset: resetWrite } = useWriteContract();
+  const receipt = useWaitForTransactionReceipt({ hash, chainId: hskChain.id });
 
   const isNative = isNativeToken(escrow.token);
 
@@ -49,14 +70,61 @@ export function EscrowCard({ id, escrow }: { id: number; escrow: Escrow }) {
     : `${formatTokenBalance(escrow.amount, tokenDecimals)} ${tokenSymbol}`;
 
   const expired = Number(escrow.expiry) <= Math.floor(Date.now() / 1000);
-  const canClaim = address?.toLowerCase() === escrow.recipient.toLowerCase() && escrow.status === 0;
-  const canRefund = address?.toLowerCase() === escrow.sender.toLowerCase() && escrow.status === 0 && expired;
 
-  const action = canClaim
-    ? () => writeContract({ address: hashGuardAddress!, abi: hashGuardAbi, functionName: "claim", args: [BigInt(id)] })
-    : canRefund
-    ? () => writeContract({ address: hashGuardAddress!, abi: hashGuardAbi, functionName: "refund", args: [BigInt(id)] })
-    : undefined;
+  // Determine permissions based on effective local status
+  const canClaim =
+    address?.toLowerCase() === escrow.recipient.toLowerCase() &&
+    localStatus === 0 &&
+    !receipt.isSuccess;
+
+  const canRefund =
+    address?.toLowerCase() === escrow.sender.toLowerCase() &&
+    localStatus === 0 &&
+    expired &&
+    !receipt.isSuccess;
+
+  // React immediately upon confirmed transaction
+  useEffect(() => {
+    if (receipt.isSuccess) {
+      if (canClaim) setLocalStatus(1);
+      if (canRefund) setLocalStatus(2);
+
+      // Invalidate all query caches so parent pages & lists refresh immediately
+      queryClient.invalidateQueries();
+      if (onActionSuccess) onActionSuccess();
+
+      // Second invalidation after 2.5s to overcome any RPC node lag
+      const timer = setTimeout(() => {
+        queryClient.invalidateQueries();
+        if (onActionSuccess) onActionSuccess();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [receipt.isSuccess, canClaim, canRefund, queryClient, onActionSuccess]);
+
+  function handleClaim() {
+    if (!hashGuardAddress) return;
+    resetWrite();
+    writeContract({
+      chainId: hskChain.id,
+      address: hashGuardAddress,
+      abi: hashGuardAbi,
+      functionName: "claim",
+      args: [BigInt(id)],
+    });
+  }
+
+  function handleRefund() {
+    if (!hashGuardAddress) return;
+    resetWrite();
+    writeContract({
+      chainId: hskChain.id,
+      address: hashGuardAddress,
+      abi: hashGuardAbi,
+      functionName: "refund",
+      args: [BigInt(id)],
+    });
+  }
 
   return (
     <article className="card border border-white/[0.06] bg-slate-950/70 p-5 backdrop-blur-md">
@@ -72,14 +140,14 @@ export function EscrowCard({ id, escrow }: { id: number; escrow: Escrow }) {
         </div>
         <span
           className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-            escrow.status === 0
+            localStatus === 0
               ? "bg-amber-400/15 text-amber-300 border border-amber-400/30"
-              : escrow.status === 1
+              : localStatus === 1
               ? "bg-emerald-400/15 text-emerald-300 border border-emerald-400/30"
               : "bg-gray-400/15 text-gray-300 border border-gray-400/30"
           }`}
         >
-          {labels[escrow.status] || "Unknown"}
+          {labels[localStatus] || "Unknown"}
         </span>
       </div>
 
@@ -107,29 +175,71 @@ export function EscrowCard({ id, escrow }: { id: number; escrow: Escrow }) {
         <Link href={`/pay/${id}`} className="button button-secondary flex-1 text-xs text-center py-2 px-2 truncate">
           Details
         </Link>
-        {action && (
+
+        {/* Claim / Refund Buttons */}
+        {localStatus === 1 ? (
+          <span className="rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-300 text-center flex-1 truncate cursor-default">
+            Claimed ✓
+          </span>
+        ) : localStatus === 2 ? (
+          <span className="rounded-xl border border-gray-500/30 bg-gray-500/15 px-3 py-2 text-xs font-bold text-gray-300 text-center flex-1 truncate cursor-default">
+            Refunded ✓
+          </span>
+        ) : canClaim ? (
           <button
+            type="button"
             className="button button-primary flex-1 text-xs py-2 px-2 truncate"
-            disabled={isPending || receipt.isLoading}
-            onClick={action}
+            disabled={isPending || receipt.isLoading || receipt.isSuccess}
+            onClick={handleClaim}
           >
-            {isPending ? "Awaiting wallet…" : receipt.isLoading ? "Confirming…" : canClaim ? "Claim Payment" : "Refund Escrow"}
+            {isPending
+              ? "Awaiting wallet…"
+              : receipt.isLoading
+              ? "Claiming on chain…"
+              : receipt.isSuccess
+              ? "Claimed ✓"
+              : "Claim Payment"}
           </button>
-        )}
+        ) : canRefund ? (
+          <button
+            type="button"
+            className="button button-primary flex-1 text-xs py-2 px-2 truncate"
+            disabled={isPending || receipt.isLoading || receipt.isSuccess}
+            onClick={handleRefund}
+          >
+            {isPending
+              ? "Awaiting wallet…"
+              : receipt.isLoading
+              ? "Refunding on chain…"
+              : receipt.isSuccess
+              ? "Refunded ✓"
+              : "Refund Escrow"}
+          </button>
+        ) : null}
       </div>
 
       <TransactionState
         state={
           hash
             ? receipt.isSuccess
-              ? "Confirmed ✓"
+              ? "Confirmed on HSKChain ✓"
               : receipt.isLoading
-              ? "Confirming on HSK Chain…"
+              ? "Confirming on HSKChain…"
               : "Awaiting confirmation…"
             : undefined
         }
         hash={hash}
       />
+
+      {writeError && (
+        <p className="mt-3 rounded-xl border border-rose-500/20 bg-rose-500/10 p-2.5 text-[11px] text-rose-300">
+          {writeError.message.includes("EscrowNotPending")
+            ? "This escrow has already been claimed on-chain."
+            : writeError.message.includes("User rejected")
+            ? "Transaction was canceled in your wallet."
+            : writeError.message.slice(0, 120)}
+        </p>
+      )}
     </article>
   );
 }

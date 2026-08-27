@@ -16,7 +16,7 @@ function PaymentsContent() {
     address: hashGuardAddress,
     abi: hashGuardAbi,
     functionName: "nextEscrowId",
-    query: { enabled: Boolean(hashGuardAddress) },
+    query: { enabled: Boolean(hashGuardAddress), refetchInterval: 3000 },
   });
 
   const count = Math.min(Number(total.data || 0n), 100);
@@ -33,7 +33,7 @@ function PaymentsContent() {
 
   const escrows = useReadContracts({
     contracts,
-    query: { enabled: Boolean(hashGuardAddress && count) },
+    query: { enabled: Boolean(hashGuardAddress && count), refetchInterval: 3000 },
   });
 
   const items = useMemo(() => {
@@ -132,7 +132,15 @@ function PaymentsContent() {
       {/* Escrow Cards Grid */}
       <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
         {filteredItems.map((item) => (
-          <EscrowCard key={item.id} id={item.id} escrow={item.escrow} />
+          <EscrowCard
+            key={item.id}
+            id={item.id}
+            escrow={item.escrow}
+            onActionSuccess={() => {
+              total.refetch();
+              escrows.refetch();
+            }}
+          />
         ))}
       </div>
 

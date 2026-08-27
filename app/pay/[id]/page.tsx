@@ -15,7 +15,7 @@ export default function PaymentDetailPage() {
     abi: hashGuardAbi, 
     functionName: "getEscrow", 
     args: [BigInt(Number.isSafeInteger(id) && id >= 0 ? id : 0)], 
-    query: { enabled: Boolean(hashGuardAddress && Number.isSafeInteger(id) && id >= 0) } 
+    query: { enabled: Boolean(hashGuardAddress && Number.isSafeInteger(id) && id >= 0), refetchInterval: 3000 } 
   });
   
   return (
@@ -29,7 +29,7 @@ export default function PaymentDetailPage() {
       {result.isLoading && <p className="muted">Loading payment…</p>}
       {result.data && (
         <div className="space-y-4">
-          <EscrowCard id={id} escrow={result.data as Escrow} />
+          <EscrowCard id={id} escrow={result.data as Escrow} onActionSuccess={() => result.refetch()} />
           <a
             href={`/claim?id=${id}`}
             className="button button-secondary w-full text-center block text-xs font-bold"

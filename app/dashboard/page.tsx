@@ -49,7 +49,7 @@ function DashboardContent() {
     address: hashGuardAddress,
     abi: hashGuardAbi,
     functionName: "nextEscrowId",
-    query: { enabled: Boolean(hashGuardAddress) }
+    query: { enabled: Boolean(hashGuardAddress), refetchInterval: 3000 }
   });
 
   const count = Math.min(Number(total.data || 0n), 50);
@@ -65,7 +65,7 @@ function DashboardContent() {
 
   const escrows = useReadContracts({
     contracts,
-    query: { enabled: Boolean(hashGuardAddress && count) }
+    query: { enabled: Boolean(hashGuardAddress && count), refetchInterval: 3000 }
   });
 
   const userItems = useMemo(() => {
