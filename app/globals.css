@@ -104,6 +104,24 @@ a {
     @apply mt-1.5 w-full rounded-xl border bg-black/30 px-4 py-3 text-gray-100 outline-none placeholder:text-gray-500 transition-all duration-200 focus:border-emerald-500/70 focus:ring-4 focus:ring-emerald-500/5;
     border-color: var(--line);
   }
+  select.field {
+    cursor: pointer;
+    background-color: rgba(10, 15, 26, 0.95);
+    color: #f3f4f6;
+  }
+  select option {
+    background-color: #0b1322;
+    color: #f3f4f6;
+    padding: 8px 12px;
+  }
+  select optgroup {
+    background-color: #060b14;
+    color: #34d399;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    padding: 8px 4px;
+  }
   .label {
     @apply text-xs font-semibold uppercase tracking-wider text-gray-400;
   }

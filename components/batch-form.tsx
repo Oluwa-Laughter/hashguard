@@ -317,10 +317,10 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
             setTokenApproved(false);
           }}
         >
-          <optgroup label="⚡ Native HSKChain">
+          <optgroup label="Native HSKChain">
             <option value="HSK">HSK (Native Gas Token)</option>
           </optgroup>
-          <optgroup label="💵 Global Stablecoins">
+          <optgroup label="Global Stablecoins">
             {supportedTokens
               .filter((t) => t.category === "stablecoin")
               .map((t) => (
@@ -329,7 +329,7 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
                 </option>
               ))}
           </optgroup>
-          <optgroup label="💎 Crypto Assets">
+          <optgroup label="Crypto Assets">
             {supportedTokens
               .filter((t) => t.category === "defi")
               .map((t) => (
@@ -338,7 +338,7 @@ export function BatchForm({ initial, initialSymbol }: { initial?: string; initia
                 </option>
               ))}
           </optgroup>
-          <optgroup label="⚙️ Custom">
+          <optgroup label="Custom Token">
             <option value="CUSTOM">Custom ERC-20 Token…</option>
           </optgroup>
         </select>

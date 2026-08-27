@@ -197,8 +197,9 @@ function UsernameContent() {
               <p>
                 Bound to: <strong className="font-mono text-white">{address ? shortAddress(address) : ""}</strong>
               </p>
-              <p className="text-gray-400 text-xs mt-1">
-                🔒 <strong>Immutable Binding</strong>: Usernames on HashGuard are permanently bound to your wallet address and cannot be changed or updated.
+              <p className="text-gray-400 text-xs mt-1 flex items-center gap-1.5">
+                <Icon name="lock" className="h-3.5 w-3.5 text-emerald-400 flex-shrink-0" />
+                <span><strong>Immutable Binding</strong>: Usernames on HashGuard are permanently bound to your wallet address and cannot be changed or updated.</span>
               </p>
             </div>
 

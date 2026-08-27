@@ -425,7 +425,7 @@ function DashboardContent() {
                 <div key={id} className="flex items-center justify-between p-5 hover:bg-white/[0.01] transition-colors">
                   <div className="flex items-center gap-3">
                     <span className={`rounded-xl p-2 bg-white/[0.03] ${isSender ? "text-rose-400" : "text-emerald-400"}`}>
-                      <Icon name={isSender ? "arrow" : "shield"} className="h-4.5 w-4.5 rotate-[-45deg]" />
+                      <Icon name={isSender ? "arrow" : "shield"} className="h-4 w-4 rotate-[-45deg]" />
                     </span>
                     <div>
                       <p className="text-sm font-bold text-white">{actionLabel}</p>

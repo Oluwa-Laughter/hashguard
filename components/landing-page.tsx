@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
 import { AnimatedShield } from "@/components/animated-shield";
 import { Icon, type IconName } from "@/components/icons";
@@ -28,72 +26,149 @@ const flow = [
 
 export function LandingPage() {
   const { isConnected } = useAccount();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isConnected) {
-      router.push("/dashboard");
-    }
-  }, [isConnected, router]);
 
   return (
     <main className="relative z-10">
-      {/* Hero Section */}
+      {/* Exceptional Hero Section */}
       <section className="relative overflow-hidden border-b border-white/[0.04]">
-        <div className="hero-grid pointer-events-none absolute inset-0" />
-        <div className="hero-glow pointer-events-none absolute -right-32 top-0 h-[680px] w-[680px]" />
+        <div className="hero-grid pointer-events-none absolute inset-0 opacity-40" />
+        <div className="hero-glow pointer-events-none absolute -right-32 top-0 h-[720px] w-[720px] opacity-70" />
         
-        <div className="shell grid min-h-[calc(100vh-70px)] items-center gap-10 py-16 lg:grid-cols-[1.1fr_.9fr] lg:py-24">
+        <div className="shell grid min-h-[calc(100vh-70px)] items-center gap-12 py-16 lg:grid-cols-[1.1fr_.9fr] lg:py-24">
           <div className="relative z-10 text-left">
             <ScrollReveal>
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-950/20 px-3.5 py-1.5 text-xs font-semibold text-cyan-400">
-                <span className="status-dot h-1.5 w-1.5 bg-cyan-400" />
-                Built for HSK Chain
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-semibold text-emerald-300 shadow-sm backdrop-blur-md">
+                <span className="status-dot h-2 w-2 bg-emerald-400 animate-pulse" />
+                HSKChain Testnet (Chain ID 133) · Non-Custodial Protocol
               </div>
             </ScrollReveal>
             
             <ScrollReveal delay={100}>
-              <h1 className="mt-6 text-5xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl leading-[1.05]">
-                Payments, <br />
-                <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">protected</span> by design.
+              <h1 className="mt-6 text-5xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl leading-[1.04]">
+                Programmable payments, <br />
+                <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
+                  protected by design.
+                </span>
               </h1>
             </ScrollReveal>
             
             <ScrollReveal delay={200}>
-              <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-400">
-                Send crypto with confidence. HashGuard turns payment intent into protected on-chain execution on HSK Chain.
+              <p className="mt-6 max-w-xl text-base sm:text-lg leading-relaxed text-gray-300 font-normal">
+                Send crypto with total certainty. HashGuard locks funds in non-custodial smart contracts until verified recipients claim, with sender refund guarantees, atomic batching, and autonomous AI-assisted execution on HSK Chain.
               </p>
             </ScrollReveal>
             
             <ScrollReveal delay={300}>
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link href="/dashboard" className="button button-primary">
-                  Launch App <Icon name="arrow" className="h-4 w-4" />
+              <div className="mt-8 flex flex-wrap items-center gap-4">
+                <Link
+                  href="/dashboard"
+                  className="button button-primary px-6 py-3.5 text-sm font-bold shadow-lg shadow-emerald-500/25 flex items-center gap-2"
+                >
+                  <span>{isConnected ? "Open Dashboard" : "Launch Dashboard"}</span>
+                  <Icon name="arrow" className="h-4 w-4" />
                 </Link>
-                <WalletButton />
-                <Link href="#how-it-works" className="button button-secondary">
-                  How it works
+                {!isConnected && <WalletButton />}
+                <Link
+                  href="#how-it-works"
+                  className="button button-secondary px-5 py-3.5 text-sm font-semibold"
+                >
+                  How It Works
                 </Link>
               </div>
             </ScrollReveal>
             
             <ScrollReveal delay={400}>
-              <div className="mt-12 flex flex-wrap gap-x-8 gap-y-4 border-t border-white/[0.06] pt-8 text-sm text-gray-500">
-                <span className="flex items-center gap-2.5">
-                  <Icon name="shield" className="h-5 w-5 text-emerald-400" />
-                  Smart-contract escrow
-                </span>
-                <span className="flex items-center gap-2.5">
-                  <Icon name="spark" className="h-5 w-5 text-cyan-400" />
-                  AI-prepared execution
-                </span>
+              <div className="mt-12 grid grid-cols-3 gap-4 border-t border-white/[0.08] pt-8 text-left">
+                <div>
+                  <p className="font-mono text-xl sm:text-2xl font-extrabold text-white">0%</p>
+                  <p className="text-xs text-gray-400 mt-0.5 font-medium">Custodial Risk (Direct Escrows)</p>
+                </div>
+                <div>
+                  <p className="font-mono text-xl sm:text-2xl font-extrabold text-emerald-400">1-to-1</p>
+                  <p className="text-xs text-gray-400 mt-0.5 font-medium">Immutable Verified Handles</p>
+                </div>
+                <div>
+                  <p className="font-mono text-xl sm:text-2xl font-extrabold text-cyan-400">100%</p>
+                  <p className="text-xs text-gray-400 mt-0.5 font-medium">Atomic Batch Settlement</p>
+                </div>
               </div>
             </ScrollReveal>
           </div>
           
+          {/* Hero Visual: Live Interactive Escrow Card Preview */}
           <div className="relative flex justify-center lg:justify-end">
-            <ScrollReveal delay={200}>
-              <AnimatedShield />
+            <ScrollReveal delay={200} className="w-full max-w-md lg:max-w-lg">
+              <div className="relative w-full">
+                <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 blur-xl opacity-70" />
+                
+                <div className="relative rounded-2xl border border-white/[0.1] bg-slate-950/90 p-6 sm:p-7 shadow-2xl backdrop-blur-2xl text-left">
+                  {/* Top Bar */}
+                  <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-sm">
+                        <Icon name="shield" className="h-5 w-5" />
+                      </span>
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Live Escrow Protocol</p>
+                        <p className="text-[11px] text-gray-400 font-mono">Escrow #1042 · Time-Locked</p>
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
+                      <span className="status-dot h-1.5 w-1.5 bg-emerald-400 animate-pulse" />
+                      Protected Active
+                    </span>
+                  </div>
+
+                  {/* Body Details */}
+                  <div className="mt-5 space-y-3 text-xs">
+                    <div className="flex items-center justify-between rounded-xl bg-white/[0.02] border border-white/[0.04] p-3">
+                      <span className="text-gray-400 font-medium">Verified Recipient</span>
+                      <div className="flex items-center gap-1.5 font-semibold text-white">
+                        <span className="text-emerald-400 font-bold">@alice</span>
+                        <span className="text-gray-500 font-mono text-[11px]">(0x742d…8f44)</span>
+                        <Icon name="check" className="h-3.5 w-3.5 text-emerald-400" />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-xl bg-white/[0.02] border border-white/[0.04] p-3">
+                      <span className="text-gray-400 font-medium">Escrow Value</span>
+                      <div className="text-right">
+                        <span className="text-sm font-extrabold text-white font-mono">100.00 USDT</span>
+                        <span className="block text-[10px] text-gray-500 font-mono">Tether USD · HSKChain</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-xl bg-white/[0.02] border border-white/[0.04] p-3">
+                      <span className="text-gray-400 font-medium">Auto-Expiry Guarantee</span>
+                      <div className="flex items-center gap-1.5 font-mono text-gray-200">
+                        <Icon name="history" className="h-3.5 w-3.5 text-cyan-400" />
+                        <span>6d 23h 59m remaining</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dual Action Simulation */}
+                  <div className="mt-5 grid grid-cols-2 gap-3 pt-1">
+                    <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-center">
+                      <p className="text-[10px] uppercase font-bold tracking-wider text-emerald-400">Recipient Portal</p>
+                      <p className="text-xs font-bold text-white mt-0.5">Claim to Wallet</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 text-center">
+                      <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400">Sender Safety</p>
+                      <p className="text-xs font-bold text-gray-300 mt-0.5">Refund on Expiry</p>
+                    </div>
+                  </div>
+
+                  {/* Bottom Verification Seal */}
+                  <div className="mt-5 flex items-center justify-between border-t border-white/[0.06] pt-3.5 text-[11px] text-gray-400">
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      Smart Contract Custody
+                    </span>
+                    <span className="font-mono text-emerald-400/90 text-[10px]">0xd10A…97e5 (Verified)</span>
+                  </div>
+                </div>
+              </div>
             </ScrollReveal>
           </div>
         </div>
@@ -282,51 +357,94 @@ export function LandingPage() {
           <ScrollReveal>
             <p className="eyebrow text-cyan-400">INTELLIGENT PAYMENTS</p>
             <h2 className="section-title">Meet your payment agent.</h2>
-            <p className="mt-5 leading-relaxed text-gray-400">
-              Tell HashGuard what you want to achieve. The agent resolves usernames to hex addresses, validates formats, and prepares the transactions. You review and sign from your own wallet.
+            <p className="mt-5 leading-relaxed text-gray-300">
+              Tell HashGuard what you want to achieve in natural language. The autonomous agent resolves usernames to hex addresses, validates token balances, checks allowances, and constructs the on-chain payload. You review and sign from your own wallet.
             </p>
-            <Link href="/agent" className="button button-secondary mt-8">
-              Explore the Agent <Icon name="arrow" className="h-4 w-4" />
-            </Link>
+            <div className="mt-8 flex items-center gap-4">
+              <Link href="/agent" className="button button-primary flex items-center gap-2">
+                <span>Launch Agent Console</span>
+                <Icon name="arrow" className="h-4 w-4" />
+              </Link>
+              <Link href="#security" className="button button-secondary">
+                Security Model
+              </Link>
+            </div>
           </ScrollReveal>
           
           <ScrollReveal delay={100}>
-            <div className="terminal-window">
-              <div className="terminal-top">
-                <span className="terminal-dot bg-rose-500/60" />
-                <span className="terminal-dot bg-amber-500/60" />
-                <span className="terminal-dot bg-emerald-500/60" />
-                <span className="ml-3 text-xs text-gray-500 font-semibold">hashguard-agent-console / hsk</span>
-              </div>
-              <div className="space-y-5 p-6 sm:p-8">
-                <div className="chat-user max-w-[85%] text-sm font-semibold">
-                  Send 2 HSK to @alice as protected payment for 7 days.
+            <div className="terminal-window rounded-2xl border border-white/[0.08] bg-slate-950/95 shadow-2xl backdrop-blur-2xl overflow-hidden">
+              <div className="terminal-top flex items-center justify-between border-b border-white/[0.06] px-5 py-3.5 bg-white/[0.02]">
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-rose-500/80" />
+                  <span className="h-3 w-3 rounded-full bg-amber-500/80" />
+                  <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
+                  <span className="ml-2 text-xs text-gray-400 font-mono font-medium">hashguard-agent-console / hsk</span>
                 </div>
-                <div className="chat-agent max-w-[90%] border border-emerald-500/20 bg-emerald-950/10">
-                  <p className="font-bold text-emerald-400 text-sm">Payment prepared.</p>
-                  <div className="mt-4 grid gap-2.5 text-xs text-gray-400">
-                    <div className="flex justify-between border-b border-white/[0.04] pb-2">
-                      <span>Recipient</span>
-                      <span className="font-semibold text-white">@alice <Icon name="check" className="ml-1 inline h-3.5 w-3.5 text-emerald-400" /></span>
+                <div className="flex items-center gap-1.5 text-[11px] font-mono text-emerald-400">
+                  <span className="status-dot h-1.5 w-1.5 bg-emerald-400 animate-pulse" />
+                  Mistral 7B Active
+                </div>
+              </div>
+              
+              <div className="space-y-4 p-5 sm:p-7">
+                {/* User Prompt */}
+                <div className="flex justify-end">
+                  <div className="rounded-2xl rounded-tr-sm bg-gradient-to-r from-emerald-600/25 to-teal-600/25 border border-emerald-500/30 px-4 py-2.5 text-xs sm:text-sm font-medium text-emerald-100 shadow-sm max-w-[85%]">
+                    &ldquo;Send 2 HSK to @alice as protected payment for 7 days.&rdquo;
+                  </div>
+                </div>
+
+                {/* Agent Response Card */}
+                <div className="rounded-2xl border border-emerald-500/25 bg-emerald-950/15 p-5 text-left shadow-lg">
+                  <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/20 text-emerald-400">
+                        <Icon name="spark" className="h-3 w-3" />
+                      </span>
+                      <span className="font-bold text-xs text-emerald-300 tracking-wide uppercase">Transaction Intent Prepared</span>
                     </div>
-                    <div className="flex justify-between border-b border-white/[0.04] pb-2">
-                      <span>Resolved Address</span>
-                      <span className="font-semibold text-white font-mono">0x742d…8f44 <Icon name="check" className="ml-1 inline h-3.5 w-3.5 text-emerald-400" /></span>
+                    <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                      Validated
+                    </span>
+                  </div>
+
+                  {/* Transaction Metadata Grid */}
+                  <div className="mt-4 grid gap-2.5 text-xs text-gray-300">
+                    <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
+                      <span className="text-gray-400">Recipient Handle</span>
+                      <span className="font-bold text-white flex items-center gap-1">
+                        @alice <Icon name="check" className="h-3.5 w-3.5 text-emerald-400" />
+                      </span>
                     </div>
-                    <div className="flex justify-between border-b border-white/[0.04] pb-2">
-                      <span>Amount</span>
-                      <span className="font-bold text-white">2 HSK</span>
+                    <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
+                      <span className="text-gray-400">Resolved Address</span>
+                      <span className="font-mono text-emerald-300 font-semibold flex items-center gap-1">
+                        0x742d…8f44 <Icon name="check" className="h-3.5 w-3.5 text-emerald-400" />
+                      </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Protection Days</span>
-                      <span className="font-semibold text-white">7 days</span>
+                    <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
+                      <span className="text-gray-400">Escrow Value</span>
+                      <span className="font-mono font-bold text-white">2.0000 HSK (Native)</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Protection Period</span>
+                      <span className="font-mono text-gray-200">7 Days (Auto-Refund Guaranteed)</span>
                     </div>
                   </div>
-                  <div className="mt-5 flex items-center justify-between border-t border-white/[0.08] pt-4">
-                    <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Ready for signing</span>
-                    <span className="rounded-xl bg-emerald-500 px-4.5 py-2 text-xs font-extrabold text-emerald-950 shadow-lg shadow-emerald-500/20">
-                      Confirm &amp; Sign
-                    </span>
+
+                  {/* Stunning Confirm Button */}
+                  <div className="mt-5 border-t border-white/[0.08] pt-4">
+                    <Link
+                      href="/agent"
+                      className="group w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-5 py-3 text-xs font-extrabold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all uppercase tracking-wider"
+                    >
+                      <Icon name="shield" className="h-4 w-4 text-slate-950 transition-transform group-hover:scale-110" />
+                      <span>Confirm &amp; Sign Transaction</span>
+                      <Icon name="arrow" className="h-3.5 w-3.5 text-slate-950 transition-transform group-hover:translate-x-1" />
+                    </Link>
+                    <p className="mt-2 text-center text-[10px] text-gray-500">
+                      Prompts your connected wallet for cryptographic authorization. HashGuard never has custody.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -336,44 +454,77 @@ export function LandingPage() {
       </section>
 
       {/* Security Architectural Pillars */}
-      <section id="security" className="border-t border-white/[0.04] bg-slate-950/40">
+      <section id="security" className="border-t border-white/[0.04] bg-slate-950/60">
         <div className="shell section-space">
           <ScrollReveal className="text-center">
             <p className="eyebrow text-emerald-400">TRUST MECHANICS</p>
             <h2 className="section-title mx-auto">Your wallet. Your signature. Your funds.</h2>
             <p className="mx-auto mt-4 max-w-2xl text-gray-400">
-              HashGuard decouples intelligence, authorization, and asset custody for robust Web3 architecture.
+              HashGuard completely decouples intelligence, authorization, and asset custody for robust, trust-minimized Web3 execution.
             </p>
           </ScrollReveal>
           
           <div className="mt-16 grid gap-6 md:grid-cols-3">
             {[
-              ["spark", "INTELLIGENT AGENT", "Translates language instructions into transaction payloads."],
-              ["user", "USER WALLET", "Confirms and signs payloads to authorize transactions."],
-              ["shield", "SMART CONTRACT", "Holds and settles funds autonomously on HSK Chain."]
-            ].map(([icon, title, copy], i) => (
-              <ScrollReveal key={title} delay={i * 100}>
-                <div className="glass-card p-8 text-center flex flex-col items-center">
-                  <span className="rounded-xl bg-emerald-500/10 p-3 text-emerald-400 mb-6">
-                    <Icon name={icon as any} className="h-6 w-6" />
-                  </span>
-                  <p className="text-xs font-extrabold tracking-widest text-cyan-400 uppercase">{title}</p>
-                  <p className="mt-3 font-semibold text-white text-base leading-relaxed">{copy}</p>
+              {
+                icon: "lock" as const,
+                badge: "CLIENT-SIDE SECURITY",
+                title: "Zero Private Key Access",
+                desc: "HashGuard never holds, requests, or transmits your private keys. Every single payment, claim, or refund is authorized locally in your wallet."
+              },
+              {
+                icon: "shield" as const,
+                badge: "DECENTRALIZED CUSTODY",
+                title: "Smart Contract Settlement",
+                desc: "All deposits remain exclusively inside immutable, open-source smart contracts on HSKChain. No team, company, or AI agent can freeze your capital."
+              },
+              {
+                icon: "history" as const,
+                badge: "FAIL-SAFE ASSURANCE",
+                title: "Guaranteed Expiry Refund",
+                desc: "Every escrow enforces a hard mathematical expiration. If the recipient does not claim within the window, 100% of the funds are refundable to you."
+              }
+            ].map((pillar, i) => (
+              <ScrollReveal key={pillar.title} delay={i * 100}>
+                <div className="glass-card p-7 text-left flex flex-col justify-between h-full border border-white/[0.06] hover:border-emerald-500/30 transition-all group">
+                  <div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-sm group-hover:scale-105 transition-transform">
+                      <Icon name={pillar.icon} className="h-5 w-5" />
+                    </div>
+                    <span className="mt-6 block text-[10px] font-extrabold tracking-widest text-emerald-400 uppercase">
+                      {pillar.badge}
+                    </span>
+                    <h3 className="mt-2 text-lg font-bold text-white">{pillar.title}</h3>
+                    <p className="mt-3 text-xs leading-relaxed text-gray-400">{pillar.desc}</p>
+                  </div>
                 </div>
               </ScrollReveal>
             ))}
           </div>
           
-          <ScrollReveal>
-            <div className="mt-10 grid gap-4 rounded-2xl border border-emerald-500/20 bg-emerald-950/5 p-6 text-center text-sm text-gray-300 sm:grid-cols-2">
-              <p className="flex items-center justify-center gap-2">
-                <Icon name="lock" className="h-4.5 w-4.5 text-emerald-400" />
-                HashGuard never requests your private key.
-              </p>
-              <p className="flex items-center justify-center gap-2">
-                <Icon name="shield" className="h-4.5 w-4.5 text-emerald-400" />
-                All funds remain in decentralized smart contracts.
-              </p>
+          {/* Verified Architecture Banner */}
+          <ScrollReveal delay={200}>
+            <div className="mt-10 rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-950/20 via-slate-900/80 to-cyan-950/20 p-5 sm:p-6 backdrop-blur-xl">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    <Icon name="check" className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-white">Live Verified Smart Contracts</p>
+                    <p className="text-xs text-gray-400">Deployed and verified on HSKChain Testnet (Chain ID 133)</p>
+                  </div>
+                </div>
+                <a
+                  href="https://testnet-explorer.hskchain.net/address/0xd10a0fec90775204aa9f0af7b99f89f6a6eb97e5#code"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="button button-secondary text-xs py-2.5 px-4 flex items-center gap-2 hover:text-white shrink-0"
+                >
+                  <span>Inspect Code on Explorer</span>
+                  <Icon name="link" className="h-3.5 w-3.5 text-emerald-400" />
+                </a>
+              </div>
             </div>
           </ScrollReveal>
         </div>

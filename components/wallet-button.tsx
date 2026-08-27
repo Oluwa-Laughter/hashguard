@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useRouter, usePathname } from "next/navigation";
 import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { hskChain, hskConfigured } from "@/lib/chains";
 import { shortAddress } from "@/lib/utils";
@@ -94,8 +93,6 @@ export function WalletButton({ className = "" }: { className?: string }) {
   const { username } = useUserUsername(address);
   const [showModal, setShowModal] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const router = useRouter();
-  const pathname = usePathname();
 
   const wrongNetwork = isConnected && hskConfigured && chainId !== hskChain.id;
 
@@ -104,15 +101,12 @@ export function WalletButton({ className = "" }: { className?: string }) {
     setIsClient(true);
   }, []);
 
-  // Auto-close modal and redirect straight to dashboard if on landing page
+  // Auto-close modal when wallet connects
   useEffect(() => {
     if (isConnected) {
       setShowModal(false);
-      if (pathname === "/") {
-        router.push("/dashboard");
-      }
     }
-  }, [isConnected, pathname, router]);
+  }, [isConnected]);
 
   function handleConnect(connector: (typeof connectors)[number]) {
     if (typeof window !== "undefined") {
@@ -123,20 +117,6 @@ export function WalletButton({ className = "" }: { className?: string }) {
       }
     }
     connect({ connector });
-  }
-
-  function handleDirectBrowser() {
-    if (typeof window !== "undefined") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const eth = (window as any).ethereum;
-      if (eth?.request) {
-        eth.request({ method: "eth_requestAccounts" }).catch(() => {});
-      }
-      const fallback = connectors.find((c) => c.id === "injected") || connectors[0];
-      if (fallback) {
-        connect({ connector: fallback });
-      }
-    }
   }
 
   const uniqueConnectors = useMemo(() => {
@@ -215,43 +195,12 @@ export function WalletButton({ className = "" }: { className?: string }) {
             Connect Wallet
           </h3>
           <p className="text-xs text-gray-400 mt-2 max-w-xs leading-relaxed mx-auto">
-            Securely connect your wallet to interact with HashGuard on {hskChain.name}.
+            Choose your preferred wallet to connect to HashGuard on {hskChain.name}.
           </p>
         </div>
 
-        {/* Fast Direct Extension Trigger */}
-        <div className="mt-5 flex-shrink-0">
-          <button
-            type="button"
-            onClick={handleDirectBrowser}
-            className="w-full flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 p-3.5 text-left transition-all group"
-          >
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
-                <Icon name="spark" className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="font-bold text-sm text-emerald-400">
-                  Direct Browser Extension
-                </p>
-                <p className="text-[11px] text-gray-400">Pop up active wallet (MetaMask, Phantom, OKX, etc.)</p>
-              </div>
-            </div>
-            <Icon name="arrow" className="h-4 w-4 text-emerald-400 rotate-[-45deg]" />
-          </button>
-        </div>
-
-        <div className="relative my-4 text-center flex-shrink-0">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/[0.06]" />
-          </div>
-          <span className="relative bg-slate-950 px-3 text-[10px] uppercase font-bold tracking-wider text-gray-500">
-            Or choose wallet
-          </span>
-        </div>
-
         {/* Connector List (Scrollable Area) */}
-        <div className="overflow-y-auto max-h-[300px] pr-1.5 space-y-2.5 scrollbar-thin flex-grow">
+        <div className="overflow-y-auto max-h-[340px] pr-1.5 space-y-2.5 scrollbar-thin flex-grow mt-6">
           {uniqueConnectors.length === 0 ? (
             <p className="text-sm text-amber-300 bg-amber-500/10 rounded-xl p-3 border border-amber-500/25">
               No compatible wallet extensions found. Please install MetaMask or Coinbase Wallet.

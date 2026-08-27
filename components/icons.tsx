@@ -24,7 +24,8 @@ const paths: Record<IconName, React.ReactNode> = {
   x: <path d="M18 6 6 18M6 6l12 12" />
 };
 
-export function Icon({ name, className = "", ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className} {...props}>{paths[name]}</svg>;
+export function Icon({ name, className = "h-4 w-4", ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {
+  const finalClass = className ? className : "h-4 w-4";
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`shrink-0 ${finalClass}`} {...props}>{paths[name]}</svg>;
 }
 
