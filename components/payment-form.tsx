@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { parseEther, parseUnits, zeroAddress, type Address } from "viem";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   contractsConfigured,
   erc20Abi,
@@ -12,8 +13,10 @@ import {
   usernameRegistryAbi,
   usernameRegistryAddress,
 } from "@/lib/contracts";
+import { hskChain } from "@/lib/chains";
 import { cleanUsername, shortAddress, formatFriendlyError } from "@/lib/utils";
 import { TransactionState } from "@/components/transaction-state";
+import { CopyButton } from "@/components/copy-button";
 import { Icon } from "@/components/icons";
 import { getSupportedTokens, isNativeToken, TokenInfo, NATIVE_HSK } from "@/lib/tokens";
 import { resolveUsernameApi } from "@/lib/username-client";
@@ -167,8 +170,23 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
     return false;
   }, [isNative, tokenApproved, allowanceQuery.data, parsedAmount]);
 
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const receipt = useWaitForTransactionReceipt({ hash });
+  const queryClient = useQueryClient();
+  const { writeContract, data: hash, isPending, reset: resetWrite } = useWriteContract();
+  const receipt = useWaitForTransactionReceipt({ hash, chainId: hskChain.id });
+
+  const [origin, setOrigin] = useState("");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+  }, []);
+
+  // Invalidate queries when escrow is confirmed
+  useEffect(() => {
+    if (receipt.isSuccess) {
+      queryClient.invalidateQueries();
+    }
+  }, [receipt.isSuccess, queryClient]);
 
   // Calculate exact expiry timestamp (in seconds)
   const expiryTimestamp = useMemo(() => {
@@ -235,11 +253,13 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
   function sign() {
     if (!resolved || !hashGuardAddress) return;
     setError(undefined);
+    resetWrite();
 
     if (isNative) {
       setTransactionKind("escrow");
       writeContract(
         {
+          chainId: hskChain.id,
           address: hashGuardAddress,
           abi: hashGuardAbi,
           functionName: "createNativeEscrow",
@@ -254,6 +274,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
         setTransactionKind("escrow");
         writeContract(
           {
+            chainId: hskChain.id,
             address: hashGuardAddress,
             abi: hashGuardAbi,
             functionName: "createTokenEscrow",
@@ -265,6 +286,7 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
         setTransactionKind("approve");
         writeContract(
           {
+            chainId: hskChain.id,
             address: targetToken,
             abi: erc20Abi,
             functionName: "approve",
@@ -278,6 +300,9 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
 
   // Success Receipt Screen to prevent double submission
   if (transactionKind === "escrow" && receipt.isSuccess) {
+    const explorerUrl = hskChain.blockExplorers?.default.url || "https://testnet-explorer.hskchain.net";
+    const claimUrl = `${origin}/claim`;
+
     return (
       <div className="card text-center py-10 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto">
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
@@ -285,10 +310,10 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
         </span>
         <h2 className="text-xl font-extrabold text-white mt-5">Payment Escrow Confirmed!</h2>
         <p className="text-sm text-gray-300 mt-2 max-w-md mx-auto leading-relaxed">
-          Your transaction has been finalized on HSKChain. The funds of <strong className="text-emerald-400">{amount} {tokenSymbol}</strong> are now safely locked under protection.
+          Your transaction has been finalized on {hskChain.name}. The funds of <strong className="text-emerald-400">{amount} {tokenSymbol}</strong> are now safely locked under protection.
         </p>
 
-        <div className="mt-6 p-4 rounded-xl border border-white/[0.04] bg-white/[0.02] text-xs max-w-sm mx-auto text-left space-y-2 text-gray-400">
+        <div className="mt-6 p-4 rounded-xl border border-white/[0.04] bg-white/[0.02] text-xs max-w-md mx-auto text-left space-y-2.5 text-gray-400">
           <div className="flex justify-between">
             <span>Recipient:</span>
             <span className="text-white font-bold">{recipient}</span>
@@ -304,31 +329,42 @@ export function PaymentForm({ initial, compact }: PaymentFormProps) {
             <span className="text-white font-semibold">{formattedExpiry}</span>
           </div>
           {hash && (
-            <div className="flex justify-between border-t border-white/[0.04] pt-2 mt-2">
+            <div className="flex justify-between items-center border-t border-white/[0.04] pt-2 mt-2">
               <span>Tx Hash:</span>
-              <a
-                href={`https://explorer.hsk.xyz/tx/${hash}`}
-                target="_blank"
-                rel="noreferrer"
-                className="font-mono text-emerald-400 hover:underline"
-              >
-                {shortAddress(hash)}
-              </a>
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={`${explorerUrl}/tx/${hash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-emerald-400 hover:underline"
+                >
+                  {shortAddress(hash)}
+                </a>
+                <CopyButton text={hash} iconOnly title="Copy transaction hash" />
+              </div>
             </div>
           )}
+          <div className="flex justify-between items-center border-t border-white/[0.04] pt-2">
+            <span>Claim Portal for Recipient:</span>
+            <CopyButton text={claimUrl} label="Copy Claim Link" />
+          </div>
         </div>
 
         <div className="mt-8 flex justify-center gap-3">
           <button
             onClick={() => {
-              window.location.reload();
+              setRecipient("");
+              setAmount("");
+              setReviewing(false);
+              setTransactionKind(undefined);
+              resetWrite();
             }}
             className="button button-primary text-xs py-2.5 px-4"
           >
             Create New Payment
           </button>
           <Link href="/payments" className="button button-secondary text-xs py-2.5 px-4">
-            View Escrow Inbox
+            View Escrow History
           </Link>
         </div>
       </div>

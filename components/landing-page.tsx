@@ -39,7 +39,7 @@ export function LandingPage() {
             <ScrollReveal>
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-semibold text-emerald-300 shadow-sm backdrop-blur-md">
                 <span className="status-dot h-2 w-2 bg-emerald-400 animate-pulse" />
-                HSKChain Testnet (Chain ID 133) · Non-Custodial Protocol
+                HashKey Chain · Non-Custodial Protocol
               </div>
             </ScrollReveal>
             

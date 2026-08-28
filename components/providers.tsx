@@ -53,8 +53,8 @@ const config = createConfig({
     injected({ shimDisconnect: true }),
   ],
   transports: {
-    [hskTestnet.id]: http(hskTestnet.rpcUrls.default.http[0]),
-    [hskMainnet.id]: http(hskMainnet.rpcUrls.default.http[0]),
+    [hskTestnet.id]: http(hskTestnet.rpcUrls.default.http[0], { batch: { batchSize: 50, wait: 16 } }),
+    [hskMainnet.id]: http(hskMainnet.rpcUrls.default.http[0], { batch: { batchSize: 50, wait: 16 } }),
   },
   ssr: true,
 });

@@ -13,4 +13,9 @@ hsk_mainnet = "https://mainnet.hsk.xyz"
 
 [etherscan]
 hsk_testnet = { key = "any", url = "https://testnet-explorer.hskchain.net/api" }
+hsk_mainnet = { key = "any", url = "https://hashkey.blockscout.com/api" }
+
+[lint]
+exclude_lints = ["block-timestamp"]
+
 

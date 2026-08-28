@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { parseEther, parseUnits, formatEther, zeroAddress, type Address } from "viem";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   scheduledPaymentAddress,
   scheduledPaymentAbi,
@@ -11,8 +12,10 @@ import {
   usernameRegistryAddress,
   erc20Abi,
 } from "@/lib/contracts";
+import { hskChain } from "@/lib/chains";
 import { cleanUsername, shortAddress, formatFriendlyError } from "@/lib/utils";
 import { TransactionState } from "@/components/transaction-state";
+import { CopyButton } from "@/components/copy-button";
 import { Icon } from "@/components/icons";
 import { resolveUsernameApi } from "@/lib/username-client";
 import {
@@ -136,8 +139,16 @@ export function RecurringForm({ initial }: RecurringFormProps) {
     (resolution.data && resolution.data !== zeroAddress ? resolution.data : undefined) ||
     apiResolvedAddress) as Address | undefined;
 
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const receipt = useWaitForTransactionReceipt({ hash });
+  const queryClient = useQueryClient();
+  const { writeContract, data: hash, isPending, reset: resetWrite } = useWriteContract();
+  const receipt = useWaitForTransactionReceipt({ hash, chainId: hskChain.id });
+
+  // Invalidate queries when schedule is confirmed
+  useEffect(() => {
+    if (receipt.isSuccess) {
+      queryClient.invalidateQueries();
+    }
+  }, [receipt.isSuccess, queryClient]);
 
   // Map interval type to seconds
   const intervalSeconds = useMemo(() => {
@@ -145,15 +156,13 @@ export function RecurringForm({ initial }: RecurringFormProps) {
       if (intervalType === "daily") return 60n; // 1 min for testing
       if (intervalType === "weekly") return 120n; // 2 mins for testing
       return 180n; // 3 mins for testing
-    } else {
-      if (intervalType === "daily") return 86400n;
-      if (intervalType === "weekly") return 604800n;
-      return 2592000n; // 30 days
     }
+    if (intervalType === "daily") return 86400n;
+    if (intervalType === "weekly") return 604800n;
+    return 2592000n; // 30 days default monthly
   }, [intervalType, demoMode]);
 
-  const numPeriods = Math.max(1, parseInt(periods || "1", 10));
-
+  const numPeriods = Number(periods) || 1;
   const parsedAmountPerPeriod = useMemo(() => {
     try {
       if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return 0n;
@@ -163,9 +172,7 @@ export function RecurringForm({ initial }: RecurringFormProps) {
     }
   }, [amount, isNative, tokenDecimals]);
 
-  const totalAmount = useMemo(() => {
-    return parsedAmountPerPeriod * BigInt(numPeriods);
-  }, [parsedAmountPerPeriod, numPeriods]);
+  const totalAmount = parsedAmountPerPeriod * BigInt(numPeriods);
 
   // Check ERC-20 Allowance
   const allowance = useReadContract({
@@ -238,11 +245,13 @@ export function RecurringForm({ initial }: RecurringFormProps) {
   function sign() {
     if (!resolved || !scheduledPaymentAddress) return;
     setError(undefined);
+    resetWrite();
 
     if (isNative) {
       setTransactionKind("create");
       writeContract(
         {
+          chainId: hskChain.id,
           address: scheduledPaymentAddress,
           abi: scheduledPaymentAbi,
           functionName: "createSchedule",
@@ -256,6 +265,7 @@ export function RecurringForm({ initial }: RecurringFormProps) {
         setTransactionKind("create");
         writeContract(
           {
+            chainId: hskChain.id,
             address: scheduledPaymentAddress,
             abi: scheduledPaymentAbi,
             functionName: "createSchedule",
@@ -267,6 +277,7 @@ export function RecurringForm({ initial }: RecurringFormProps) {
         setTransactionKind("approve");
         writeContract(
           {
+            chainId: hskChain.id,
             address: tokenAddressToUse,
             abi: erc20Abi,
             functionName: "approve",
@@ -280,7 +291,9 @@ export function RecurringForm({ initial }: RecurringFormProps) {
 
   // Success Receipt Screen to prevent double submission
   if (transactionKind === "create" && receipt.isSuccess) {
-    const totalAmount = (Number(amount) * numPeriods).toFixed(2).replace(/\.00$/, "");
+    const totalFormatted = (Number(amount) * numPeriods).toFixed(2).replace(/\.00$/, "");
+    const explorerUrl = hskChain.blockExplorers?.default.url || "https://testnet-explorer.hskchain.net";
+
     return (
       <div className="card text-center py-10 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto">
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
@@ -288,10 +301,10 @@ export function RecurringForm({ initial }: RecurringFormProps) {
         </span>
         <h2 className="text-xl font-extrabold text-white mt-5">Recurring Schedule Funded!</h2>
         <p className="text-sm text-gray-300 mt-2 max-w-md mx-auto leading-relaxed">
-          Your recurring schedule has been successfully deployed and funded on HSKChain. Senders can view period releases inside the Subscription Monitor.
+          Your recurring schedule has been successfully deployed and funded on {hskChain.name}. Senders can view period releases inside the Subscription Monitor.
         </p>
 
-        <div className="mt-6 p-4 rounded-xl border border-white/[0.04] bg-white/[0.02] text-xs max-w-sm mx-auto text-left space-y-2 text-gray-400">
+        <div className="mt-6 p-4 rounded-xl border border-white/[0.04] bg-white/[0.02] text-xs max-w-md mx-auto text-left space-y-2.5 text-gray-400">
           <div className="flex justify-between">
             <span>Recipient:</span>
             <span className="text-white font-bold">{recipient}</span>
@@ -304,19 +317,22 @@ export function RecurringForm({ initial }: RecurringFormProps) {
           </div>
           <div className="flex justify-between border-t border-white/[0.04] pt-2 mt-2">
             <span className="font-bold text-gray-300">Total Commitment Locked:</span>
-            <span className="font-mono text-emerald-400 font-bold">{totalAmount} {tokenSymbol}</span>
+            <span className="font-mono text-emerald-400 font-bold">{totalFormatted} {tokenSymbol}</span>
           </div>
           {hash && (
-            <div className="flex justify-between border-t border-white/[0.04] pt-2 mt-2">
+            <div className="flex justify-between items-center border-t border-white/[0.04] pt-2 mt-2">
               <span>Tx Hash:</span>
-              <a
-                href={`https://explorer.hsk.xyz/tx/${hash}`}
-                target="_blank"
-                rel="noreferrer"
-                className="font-mono text-emerald-400 hover:underline"
-              >
-                {shortAddress(hash)}
-              </a>
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={`${explorerUrl}/tx/${hash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-emerald-400 hover:underline"
+                >
+                  {shortAddress(hash)}
+                </a>
+                <CopyButton text={hash} iconOnly title="Copy transaction hash" />
+              </div>
             </div>
           )}
         </div>
@@ -324,7 +340,11 @@ export function RecurringForm({ initial }: RecurringFormProps) {
         <div className="mt-8 flex justify-center gap-3">
           <button
             onClick={() => {
-              window.location.reload();
+              setRecipient("");
+              setAmount("");
+              setReviewing(false);
+              setTransactionKind(undefined);
+              resetWrite();
             }}
             className="button button-primary text-xs py-2.5 px-4"
           >
